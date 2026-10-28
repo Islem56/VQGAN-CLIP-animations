@@ -13,10 +13,17 @@ snap.cjs                    screenshots of moments:   node snap.cjs out/beats be
 render.cjs                  audio + 60 fps × 3 subframes + ffmpeg tmix + mux:   node render.cjs
 ```
 
+## Palettes
+
+Four palettes, picked with the URL hash (`darcom-showreel.html#yaqout`) or `--theme` when rendering: **sunshine**, **sunnynight**, **dune**, **yaqout**.
+They are tonal (rust / brown / cream / black), so each scene has a role table (which colour is the ground, the house, the stripes…)
+chosen for contrast: see `THEMES` in `src/showreel.template.html`.
+
 ```bash
 node build.cjs            # rebuild the HTML after editing src/
 node snap.cjs out/s 2.5 7.8 12.3      # look at any moment
-node render.cjs           # → out/darcom-showreel.mp4   (about 2 minutes on 4 cores)
+node render.cjs --theme yaqout           # → out/darcom-showreel.mp4   (about 2 minutes on 4 cores)
+THEME=dune node snap.cjs out/s 2.5 7.8    # look at any moment in another palette
 ```
 
 Needs Node 20+ with Playwright (Chromium) and ffmpeg. `python3 tools/make-glyphs.py assets/montserrat-variable.woff2 > assets/glyphs.json`

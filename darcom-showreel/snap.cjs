@@ -1,5 +1,5 @@
 // Screenshots moments of the film:  node snap.cjs <outDir> <t1> <t2> …      (t in seconds)
-//   node snap.cjs beats        → one frame per beat (30 frames, at beat + 0.12 s), into out/beats/
+//   node snap.cjs <dir> beats    → one frame per beat (30 frames, at beat + 0.12 s).   THEME=dune node snap.cjs …  picks a palette
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 (async () => {
@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path');
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('[page]', m.type(), m.text()); });
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-  await page.goto('file://' + path.join(__dirname, 'darcom-showreel.html'));
+  await page.goto('file://' + path.join(__dirname, 'darcom-showreel.html') + '#' + (process.env.THEME || 'sunshine'));
   await page.evaluate(() => window.__ready);
   for (const t of times) {
     const t0 = Date.now();

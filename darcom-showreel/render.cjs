@@ -1,4 +1,4 @@
-// Renders the film:   node render.cjs [--out file.mp4] [--work dir] [--workers 4] [--frames a:b]
+// Renders the film:   node render.cjs [--theme sunshine|sunnynight|dune|yaqout] [--out file.mp4] [--work dir] [--workers 4] [--frames a:b]
 //   1. renders the soundtrack with the Web Audio API (OfflineAudioContext) → audio.wav
 //   2. renders 60 fps × 3 subframes with Playwright (each subframe = window.seek(t) + screenshot)
 //   3. blends every 3 subframes with ffmpeg tmix (motion blur), encodes H.264 and muxes the audio
@@ -12,7 +12,8 @@ const WORK = path.resolve(arg('work', path.join(__dirname, 'out', 'frames')));
 const WORKERS = +arg('workers', 4);
 const FPS = 60, SUB = 3, DUR = 15, NF = FPS * DUR;                       // 900 frames, 2700 subframes
 const [F0, F1] = arg('frames', `0:${NF}`).split(':').map(Number);
-const html = 'file://' + path.join(__dirname, 'darcom-showreel.html');
+const THEME = arg('theme', 'sunshine');
+const html = 'file://' + path.join(__dirname, 'darcom-showreel.html') + '#' + THEME;
 const tSub = (f, j) => (f === 0 ? 0 : Math.min(DUR, Math.max(0, f / FPS + (j - 1) / (FPS * SUB))));   // subframes centred on the frame time; frame 0 is the exact first-frame state (= the last frame)
 
 (async () => {

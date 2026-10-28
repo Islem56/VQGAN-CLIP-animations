@@ -41,9 +41,37 @@ const kf = (t, keys, w = 7) => {                                   // spring-eas
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const rgb = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
 const mixc = (a, b, k) => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * k);
-const COL = { K: hex('#0B0B0C'), W: [255, 255, 255], CR: hex('#F1E9DB'), V: hex('#FF4A1C'), B: hex('#2236FF') };
-const SHADOW = [12, 14, 52];                                         // shadows pick up the cobalt: no muddy greys
-const shade = (c, k) => (k < 0 ? mixc(c, SHADOW, -k) : mixc(c, COL.W, k));
+/* The palettes are tonal (rust, brown, cream, black), so every scene says which colour plays which role, chosen for contrast.
+   Pick one with the URL hash:  darcom-showreel.html#sunshine | #sunnynight | #dune | #yaqout   (default: sunshine)
+   CR = cream · V = the accent · B = the second tone · K = black. */
+const RED = {                                                    // Sunshine, Sunny Night, Yaqout
+  hook: { flood: 'V' },
+  kin: { ground: 'K', BRAND: 'CR', SHOOT: 'V', POST: 'CR', BUILD: 'V', I: 'CR' },        // the I floods the next ground
+  morph: { ground: 'CR', A: ['B', 'V', 'B', 'B'], B: ['K', 'B', 'K', 'K'], C: ['V', 'K', 'V', 'V'] },
+  house: { ground: 'CR', floor: 0.2, body: 'V', roof: 'B', door: 'K', wing: 'B' },
+  ui: { ground: 'K', card: 'CR', ink: 'K', toggle: 'V', panel: 'K', bars: ['V', 'CR'], stripes: ['B', 'CR', 'V', 'K', 'B', 'CR'] },
+  stripes: [['BRANDING', 'B', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'V', 'CR'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'B', 'CR'], ['CAFÉ', 'CR', 'V']],
+  fin: { ground: 'V', front: 'K', side: 'CR' }, shadow: ['K', 'B', 0.4],
+};
+const THEMES = {
+  sunshine: { pal: { CR: '#F4E2C9', V: '#AF422C', B: '#673A2C', K: '#0D0C0F' }, ...RED },
+  sunnynight: { pal: { CR: '#F2E9DE', V: '#9D513A', B: '#422926', K: '#090909' }, ...RED },
+  yaqout: { pal: { CR: '#F4E2C9', V: '#AF2C2E', B: '#792D1E', K: '#0D0C0F' }, ...RED },
+  dune: {                                                         // sand-on-brown: a softer, lower-contrast set
+    pal: { CR: '#F2E9DE', V: '#6E4120', B: '#D7BAA2', K: '#281E1A' },
+    hook: { flood: 'V' },
+    kin: { ground: 'K', BRAND: 'CR', SHOOT: 'B', POST: 'CR', BUILD: 'B', I: 'V' },
+    morph: { ground: 'V', A: ['CR', 'B', 'B', 'B'], B: ['B', 'CR', 'CR', 'K'], C: ['CR', 'B', 'CR', 'CR'] },
+    house: { ground: 'V', floor: 0.3, body: 'CR', roof: 'B', door: 'K', wing: 'B' },
+    ui: { ground: 'K', card: 'CR', ink: 'K', toggle: 'V', panel: 'K', bars: ['B', 'CR'], stripes: ['V', 'CR', 'B', 'K', 'V', 'CR'] },
+    stripes: [['BRANDING', 'V', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'B', 'K'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'V', 'B'], ['CAFÉ', 'CR', 'V']],
+    fin: { ground: 'B', front: 'K', side: 'V' }, shadow: ['K', 'V', 0.3],
+  },
+};
+const THEME = (location.hash || '#sunshine').slice(1).toLowerCase(), T = THEMES[THEME] || THEMES.sunshine;
+const COL = { K: hex(T.pal.K), W: [255, 255, 255], CR: hex(T.pal.CR), V: hex(T.pal.V), B: hex(T.pal.B) };
+const SHADOW = mixc(COL[T.shadow[0]], COL[T.shadow[1]], T.shadow[2]);   // shadows are warm dark tones, never grey
+const shade = (c, k) => (k < 0 ? mixc(c, SHADOW, -k) : mixc(c, COL.CR, k));
 const deg = (d) => d * Math.PI / 180;
 
 /* ───────────── dom helpers ───────────── */
@@ -115,7 +143,7 @@ function hook(t) {
   });
   hk.tag.setAttribute('y', f1(TAG_Y + 520 * sp(P(t, 0, 0.4), 8)));
   { const v = vel((tt) => [0, 520 * sp(P(tt, 0, 0.4), 8)], t); setBlur(hk.blurTag, hk.tag, 0, v[1]); }
-  hk.disc.setAttribute('fill', rgb(t < 0.0083 ? COL.K : COL.V));        // the dot turns vermilion on the very first beat
+  hk.disc.setAttribute('fill', rgb(t < 0.0083 ? COL.K : COL[T.hook.flood]));   // the dot takes the accent colour on the very first beat
   let r; if (t < 0.5) r = DOT_R * (1 + 1.2 * sp(P(t, 0, 0.5), 9)); else r = DOT_RP * Math.exp(Math.log(1650 / DOT_RP) * sp(P(t, 0.5, 0.5), 7));
   hk.disc.setAttribute('r', f1(r));
   const ringOn = t >= 1.0 && t < 1.55; hk.ring.style.display = ringOn ? '' : 'none';
@@ -125,7 +153,7 @@ function hook(t) {
 }
 
 /* ===================== 2 · KINETIC TYPE  (2 – 4 s) ===================== */
-const kn = {}; kn.bg = S('rect', { width: W, height: H, fill: rgb(COL.K) }, LK.s);
+const kn = {}; kn.bg = S('rect', { width: W, height: H, fill: rgb(COL[T.kin.ground]) }, LK.s);
 const mkWord = (word, parent, fill) => word.split('').map((ch) => S('path', { fill }, parent));
 const WSPEC = { BRAND: 'V', SHOOT: 'CR', POST: 'V', BUILD: 'CR' }, KTRACK = -22;
 const wsize = {}; Object.keys(WSPEC).forEach((w) => { wsize[w] = fitSize(w, KTRACK, 1640, 560); });
@@ -137,16 +165,16 @@ const paintWord = (paths, word, ks_, dy, cx) => {
 };
 // BRAND — rises out of a mask, width 62 → 125
 const clipBrand = S('clipPath', { id: 'cBrand' }, LK.s); kn.clipBrandR = S('rect', { x: 0, width: W }, clipBrand);
-kn.gBrandO = S('g', {}, LK.s); kn.gBrand = S('g', {}, kn.gBrandO); kn.pBrand = mkWord('BRAND', kn.gBrand, rgb(COL.V)); kn.bBrand = mkBlur();
+kn.gBrandO = S('g', {}, LK.s); kn.gBrand = S('g', {}, kn.gBrandO); kn.pBrand = mkWord('BRAND', kn.gBrand, rgb(COL[T.kin.BRAND])); kn.bBrand = mkBlur();
 // SHOOT — splits in: top half from the left, bottom half from the right
 const clipTop = S('clipPath', { id: 'cTop' }, LK.s), clipBot = S('clipPath', { id: 'cBot' }, LK.s); kn.clipTopR = S('rect', { x: 0, y: 0, width: W }, clipTop); kn.clipBotR = S('rect', { x: 0, width: W }, clipBot);
-kn.gTopO = S('g', { 'clip-path': 'url(#cTop)' }, LK.s); kn.gTop = S('g', {}, kn.gTopO); kn.pTop = mkWord('SHOOT', kn.gTop, rgb(COL.CR));
-kn.gBotO = S('g', { 'clip-path': 'url(#cBot)' }, LK.s); kn.gBot = S('g', {}, kn.gBotO); kn.pBot = mkWord('SHOOT', kn.gBot, rgb(COL.CR)); kn.bTop = mkBlur(); kn.bBot = mkBlur();
+kn.gTopO = S('g', { 'clip-path': 'url(#cTop)' }, LK.s); kn.gTop = S('g', {}, kn.gTopO); kn.pTop = mkWord('SHOOT', kn.gTop, rgb(COL[T.kin.SHOOT]));
+kn.gBotO = S('g', { 'clip-path': 'url(#cBot)' }, LK.s); kn.gBot = S('g', {}, kn.gBotO); kn.pBot = mkWord('SHOOT', kn.gBot, rgb(COL[T.kin.SHOOT])); kn.bTop = mkBlur(); kn.bBot = mkBlur();
 // POST — zooms through from 3.4×
-kn.gPost = S('g', {}, LK.s); kn.pPost = mkWord('POST', kn.gPost, rgb(COL.V)); kn.bPost = mkBlur();
+kn.gPost = S('g', {}, LK.s); kn.pPost = mkWord('POST', kn.gPost, rgb(COL[T.kin.POST])); kn.bPost = mkBlur();
 // BUILD — drops in; its cobalt I stretches into the next ground
-kn.gBuild = S('g', {}, LK.s); kn.pBuild = mkWord('BUILD', kn.gBuild, rgb(COL.CR)); kn.pBuild[2].setAttribute('fill', rgb(COL.B)); kn.bBuild = mkBlur();
-kn.flood = S('rect', { fill: rgb(COL.B) }, LK.s);
+kn.gBuild = S('g', {}, LK.s); kn.pBuild = mkWord('BUILD', kn.gBuild, rgb(COL[T.kin.BUILD])); kn.pBuild[2].setAttribute('fill', rgb(COL[T.kin.I])); kn.bBuild = mkBlur();
+kn.flood = S('rect', { fill: rgb(COL[T.kin.I]) }, LK.s);
 const brandY = (i, t) => (1 - sp(P(t, 2.0 + 0.045 * i, 0.42), 9)) * capPx('BRAND') * 1.3;
 const brandEx = (t) => -(baseOf('BRAND') + 300) * sp(P(t, 2.5, 0.34), 10);
 const shootX = (t) => { const a = 1920 * (1 - sp(P(t, 2.5, 0.4), 8)), b = 1920 * sp(P(t, 3.0, 0.32), 10); return [-a + b, a - b]; };
@@ -194,7 +222,7 @@ function kinetic(t) {
 }
 
 /* ===================== 3 · SHAPE MORPH  (4 – 6 s) ===================== */
-const mo = {}; S('rect', { width: W, height: H, fill: rgb(COL.B) }, LM.s);
+const mo = {}; S('rect', { width: W, height: H, fill: rgb(COL[T.morph.ground]) }, LM.s);
 const circP = (r) => Array.from({ length: 96 }, (_, i) => [Math.cos(i / 96 * 2 * Math.PI) * r, Math.sin(i / 96 * 2 * Math.PI) * r]);
 const rectP = (w, h) => [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
 const triP = (w, h) => [[0, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
@@ -206,7 +234,7 @@ const SHP = {
 };
 const HOUSE = { body: [960, 650], roof: [960, 365], door: [960, 705] };           // house elevation (centres), shared with the 3D scene
 const SLOT = { A: [[520, 540], [520, 540], [520, 540], HOUSE.roof], B: [[960, 540], [960, 540], [960, 540], HOUSE.door], C: [[1400, 540], [1400, 540], [1400, 540], HOUSE.body] };
-const SCOL = { A: ['V', 'CR', 'V', 'V'], B: ['CR', 'V', 'K', 'K'], C: ['K', 'K', 'CR', 'CR'] };
+const SCOL = { A: T.morph.A, B: T.morph.B, C: T.morph.C };
 const ROT = { A: [0, -32, 32, -20], B: [0, 32, -32, 20], C: [0, -32, 32, -14] };
 const rayHit = (poly, a) => { const dx = Math.cos(a), dy = Math.sin(a); let best = Infinity; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], ex = q[0] - p[0], ey = q[1] - p[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue; const tt = (p[0] * ey - p[1] * ex) / den, uu = (p[0] * dy - p[1] * dx) / den; if (tt > 1e-6 && uu >= -1e-9 && uu <= 1 + 1e-9 && tt < best) best = tt; } return best; };
 const ANG = (() => {                                            // a dense uniform fan of angles + the exact corners (the arcs need no extra samples)
@@ -295,7 +323,7 @@ const boxFaces = (x0, x1, y0, y1, zf, zb, col, skip = '') => {
 };
 
 /* ===================== 4 · 2D → 3D  (6 – 8 s) ===================== */
-const hs = {}; S('rect', { width: W, height: H, fill: rgb(COL.B) }, LHS.s);
+const hs = {}; S('rect', { width: W, height: H, fill: rgb(COL[T.house.ground]) }, LHS.s);
 hs.g = S('g', {}, LHS.s); hs.pool = mkPool(hs.g); hs.blur = mkBlur();
 const DOOR = archP(150, 230).map((p) => [p[0] + HOUSE.door[0], p[1] + HOUSE.door[1], 0.6]);
 const houseCam = (t) => ({
@@ -306,17 +334,17 @@ const houseCam = (t) => ({
 function house(t) {
   const dep = 420 * sp(P(t, 6.0, 0.45), 9), wing = 230 * sp(P(t, 6.5, 0.4), 9), cam = makeCam(houseCam(t)), zb = -dep, rb = -dep - 60;
   const faces = [];
-  faces.push({ pts: [[-9000, 820, 900], [10900, 820, 900], [10900, 820, -14000], [-9000, 820, -14000]], n: [0, -1, 0], col: shade(COL.B, -0.3), flat: true, floor: true });
-  if (dep > 0.5) faces.push(...boxFaces(700, 1220, 480, 820, 0, zb, COL.CR, 'u'));
-  else faces.push(...boxFaces(700, 1220, 480, 820, 0, -0.5, COL.CR, 'u').filter((x) => x.id === 'f'));
-  faces.push({ pts: [[640, 480, 0], [1280, 480, 0], [960, 250, 0]], n: [0, 0, 1], col: COL.V, flat: true });
+  faces.push({ pts: [[-9000, 820, 900], [10900, 820, 900], [10900, 820, -14000], [-9000, 820, -14000]], n: [0, -1, 0], col: shade(COL[T.house.ground], -T.house.floor), flat: true, floor: true });
+  if (dep > 0.5) faces.push(...boxFaces(700, 1220, 480, 820, 0, zb, COL[T.house.body], 'u'));
+  else faces.push(...boxFaces(700, 1220, 480, 820, 0, -0.5, COL[T.house.body], 'u').filter((x) => x.id === 'f'));
+  faces.push({ pts: [[640, 480, 0], [1280, 480, 0], [960, 250, 0]], n: [0, 0, 1], col: COL[T.house.roof], flat: true });
   if (dep > 0.5) {
-    faces.push({ pts: [[640, 480, rb], [1280, 480, rb], [960, 250, rb]], n: [0, 0, -1], col: COL.V });
-    faces.push({ pts: [[640, 480, 0], [960, 250, 0], [960, 250, rb], [640, 480, rb]], n: [-0.584, -0.812, 0], col: COL.V });
-    faces.push({ pts: [[1280, 480, 0], [960, 250, 0], [960, 250, rb], [1280, 480, rb]], n: [0.584, -0.812, 0], col: COL.V });
+    faces.push({ pts: [[640, 480, rb], [1280, 480, rb], [960, 250, rb]], n: [0, 0, -1], col: COL[T.house.roof] });
+    faces.push({ pts: [[640, 480, 0], [960, 250, 0], [960, 250, rb], [640, 480, rb]], n: [-0.584, -0.812, 0], col: COL[T.house.roof] });
+    faces.push({ pts: [[1280, 480, 0], [960, 250, 0], [960, 250, rb], [1280, 480, rb]], n: [0.584, -0.812, 0], col: COL[T.house.roof] });
   }
-  faces.push({ pts: DOOR, n: [0, 0, 1], col: COL.K, flat: true });
-  if (wing > 0.5) faces.push(...boxFaces(1224, 1544, 820 - wing, 820, -60, -380, COL.V, 'u'));
+  faces.push({ pts: DOOR, n: [0, 0, 1], col: COL[T.house.door], flat: true });
+  if (wing > 0.5) faces.push(...boxFaces(1224, 1544, 820 - wing, 820, -60, -380, COL[T.house.wing], 'u'));
   // the floor is always drawn first, the rest far to near
   const floor = faces.filter((f) => f.floor), rest = faces.filter((f) => !f.floor);
   const items = faceItems(cam, floor).concat(faceItems(cam, rest)); flush(hs.pool, items);
@@ -324,26 +352,26 @@ function house(t) {
 }
 
 /* ===================== 5 · DATA / UI  (8 – 10 s) ===================== */
-const ui = {}; LUI.d.style.background = rgb(COL.K);
+const ui = {}; LUI.d.style.background = rgb(COL[T.ui.ground]); const INK = COL[T.ui.ink], CARDC = COL[T.ui.card], TOGC = COL[T.ui.toggle];
 const SERVICES = ['BRANDING & DESIGN', 'PHOTO & VIDEO', 'DIGITAL COMMUNICATION', '3D & MOTION', 'BOUTIQUE & LIFESTYLE', 'CAFÉ & SWEETS'];
 const CARD = { x: 180, y: 120, w: 1560, h: 840 }, ROW0 = 150, ROWH = 100, TOG = { x: 830, w: 128, h: 64 };
-ui.card = D(`left:${CARD.x}px;top:${CARD.y}px;width:${CARD.w}px;height:${CARD.h}px;position:absolute;background:${rgb(COL.CR)};border-radius:44px;overflow:hidden`, LUI.d);
-D(`position:absolute;left:56px;top:46px;color:${rgb(COL.K)};font-size:38px;line-height:1;letter-spacing:0.01em;${type(800)}`, ui.card, 'DAR.COM');
-D(`position:absolute;right:56px;top:42px;height:52px;padding:0 26px;border-radius:26px;background:${rgb(COL.K)};color:${rgb(COL.CR)};font-size:22px;line-height:52px;letter-spacing:0.14em;${type(700, 110)}`, ui.card, 'SERVICES');
+ui.card = D(`left:${CARD.x}px;top:${CARD.y}px;width:${CARD.w}px;height:${CARD.h}px;position:absolute;background:${rgb(CARDC)};border-radius:44px;overflow:hidden`, LUI.d);
+D(`position:absolute;left:56px;top:46px;color:${rgb(INK)};font-size:38px;line-height:1;letter-spacing:0.01em;${type(800)}`, ui.card, 'DAR.COM');
+D(`position:absolute;right:56px;top:42px;height:52px;padding:0 26px;border-radius:26px;background:${rgb(INK)};color:${rgb(CARDC)};font-size:22px;line-height:52px;letter-spacing:0.14em;${type(700, 110)}`, ui.card, 'SERVICES');
 ui.rows = SERVICES.map((name, i) => {
   const y = ROW0 + ROWH * i, row = D(`position:absolute;left:0;top:${y}px;width:${CARD.w}px;height:${ROWH}px`, ui.card);
   D(`position:absolute;left:56px;right:56px;top:0;height:2px;background:rgba(11,11,12,0.12)`, row);
-  D(`position:absolute;left:56px;top:34px;color:${rgb(COL.V)};font-size:30px;line-height:1;${type(800, 110)}`, row, String(i + 1).padStart(2, '0'));
-  D(`position:absolute;left:150px;top:32px;color:${rgb(COL.K)};font-size:36px;line-height:1;letter-spacing:0;${type(700)}`, row, name);
+  D(`position:absolute;left:56px;top:34px;color:${rgb(TOGC)};font-size:30px;line-height:1;${type(800, 110)}`, row, String(i + 1).padStart(2, '0'));
+  D(`position:absolute;left:150px;top:32px;color:${rgb(INK)};font-size:36px;line-height:1;letter-spacing:0;${type(700)}`, row, name);
   const track = D(`position:absolute;left:${TOG.x}px;top:${(ROWH - TOG.h) / 2}px;width:${TOG.w}px;height:${TOG.h}px;border-radius:32px`, row), knob = D(`position:absolute;top:6px;width:52px;height:52px;border-radius:26px;background:#fff`, track);
   return { row, track, knob };
 });
-D(`position:absolute;left:1000px;top:${ROW0}px;width:504px;height:620px;border-radius:32px;background:${rgb(COL.K)}`, ui.card);
+D(`position:absolute;left:1000px;top:${ROW0}px;width:504px;height:620px;border-radius:32px;background:${rgb(COL[T.ui.panel])}`, ui.card);
 const BAR = { x0: CARD.x + 1000 + 20, base: CARD.y + ROW0 + 570, w: 54, gap: 28, hmax: 460, hs: [0.55, 0.82, 0.46, 0.96, 0.7, 0.62] };
-const STRIPE_COL = ['B', 'CR', 'V', 'K', 'B', 'CR'];
+const STRIPE_COL = T.ui.stripes;
 ui.bars = BAR.hs.map((h, i) => D(`position:absolute;border-radius:6px`, LUI.d));
 ui.cur = S('svg', { width: 80, height: 80, viewBox: '0 0 80 80', style: 'position:absolute;left:0;top:0;overflow:visible' }, LUI.d);
-ui.curP = S('path', { d: 'M4 4L4 52L17 40L26 62L36 58L27 36L45 36Z', fill: '#fff', stroke: rgb(COL.K), 'stroke-width': 4, 'stroke-linejoin': 'round' }, ui.cur);
+ui.curP = S('path', { d: 'M4 4L4 52L17 40L26 62L36 58L27 36L45 36Z', fill: '#fff', stroke: rgb(INK), 'stroke-width': 4, 'stroke-linejoin': 'round' }, ui.cur);
 ui.blurCard = mkBlur();
 const togY = (i) => CARD.y + ROW0 + ROWH * i + ROWH / 2, togX = CARD.x + TOG.x + TOG.w / 2;
 const TON = [8.50, 8.57, 8.64, 9.00, 9.07, 9.14];
@@ -356,14 +384,14 @@ function uiScene(t) {
   ui.rows.forEach((r, i) => {
     const slide = 1 - sp(P(t, 8.12 + 0.045 * i, 0.4), 9); r.row.style.transform = `translateX(${f1(-160 * slide)}px)`; r.row.style.opacity = slide > 0.99 ? 0 : 1;
     const q = sp(P(t, TON[i], 0.2), 10);
-    r.track.style.background = rgb(mixc(hex('#D9D0BF'), COL.V, q)); r.knob.style.left = f1(6 + (TOG.w - 64) * q) + 'px';
+    r.track.style.background = rgb(mixc(mixc(CARDC, INK, 0.14), TOGC, q)); r.knob.style.left = f1(6 + (TOG.w - 64) * q) + 'px';
   });
   const m = sp(P(t, 9.52, 0.44), 8);
   ui.bars.forEach((b, i) => {
     const grow = sp(P(t, TON[i] + 0.03, 0.3), 9), x = BAR.x0 + i * (BAR.w + BAR.gap), h = BAR.hs[i] * BAR.hmax * grow;
     const r0 = [x, BAR.base - h - dy * 0, BAR.w, h], r1 = [i * 320, 0, 320, H];
     const rr = r0.map((v0, j) => lerp(v0, r1[j], m)), cardShift = m < 1 ? dy * (1 - m) : 0;
-    const c0 = i % 2 ? COL.CR : COL.V, c1 = COL[STRIPE_COL[i]];
+    const c0 = COL[T.ui.bars[i % 2 ? 1 : 0]], c1 = COL[STRIPE_COL[i]];
     b.style.left = f1(rr[0]) + 'px'; b.style.top = f1(rr[1] + cardShift) + 'px'; b.style.width = f1(rr[2]) + 'px'; b.style.height = f1(Math.max(0, rr[3])) + 'px';
     b.style.borderRadius = f1(6 * (1 - m)) + 'px'; b.style.background = rgb(m > 0.12 ? c1 : c0); b.style.display = h < 0.5 && m < 0.01 ? 'none' : '';
   });
@@ -373,14 +401,14 @@ function uiScene(t) {
 
 /* ===================== 6 · THE RISER  (10 – 12 s) — type stripes ===================== */
 const st = { cols: [] };
-const STRIPES = [['BRANDING', 'B', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'V', 'K'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'B', 'CR'], ['CAFÉ', 'CR', 'V']];
+const STRIPES = T.stripes;
 STRIPES.forEach(([word, bg, fg], i) => {
   const w = D(`position:absolute;left:${i * 320}px;top:0;width:320px;height:${H}px;overflow:hidden;background:${rgb(COL[bg])}`, LST.d);
   const unit = word + '   /   ', strip = D(`position:absolute;left:0;top:0;white-space:nowrap;height:320px;line-height:320px;color:${rgb(COL[fg])};font-size:250px;transform-origin:0 0;${type(900, 100)}`, w, unit.repeat(8));
   const probe = D(`position:absolute;visibility:hidden;white-space:nowrap;font-size:250px;line-height:1;${type(900, 100)}`, LST.d, unit);
   st.cols.push({ w, strip, probe, unit: 0, blur: mkBlur() });
 });
-st.disc = D(`position:absolute;left:0;top:0;border-radius:50%;background:${rgb(COL.V)};display:none`, LST.d);
+st.disc = D(`position:absolute;left:0;top:0;border-radius:50%;background:${rgb(COL[T.fin.ground])};display:none`, LST.d);
 const scrollOff = (t) => { const a = Math.max(0, t - 10); return 520 * a + 190 * a ** 4 + 0; };
 const stripeOff = (i, t) => (i % 2 ? 1 : -1) * scrollOff(t) + (i % 2 ? -1 : 1) * 1500 * (1 - sp(P(t, 10.0 + 0.05 * i, 0.45), 9));
 function stripes(t) {
@@ -417,7 +445,7 @@ const finCam = (t) => ({
 function finale(t) {
   // ground: the vermilion disc that grew out of the dot shrinks back into it (the hook, played backwards)
   const gr = t < 14.0 ? 1650 : t < 14.5 ? DOT_RP * Math.exp(Math.log(1650 / DOT_RP) * (1 - sp(P(t, 14.0, 0.5), 7))) : DOT_R * (1 + 1.2 * (1 - sp(P(t, 14.5, 0.5), 9)));
-  fn.ground.setAttribute('r', f1(gr)); fn.ground.setAttribute('fill', rgb(COL.V));
+  fn.ground.setAttribute('r', f1(gr)); fn.ground.setAttribute('fill', rgb(COL[T.fin.ground]));
   fn.tag.setAttribute('y', f1(TAG_Y + 520 * (1 - sp(P(t, 14.5, 0.4), 8))));
   { const v = vel((tt) => [0, 520 * (1 - sp(P(tt, 14.5, 0.4), 8))], t); setBlur(fn.blurTag, fn.tag, 0, v[1]); }
   const cam = makeCam(finCam(t)), pool = [];
@@ -433,13 +461,13 @@ function finale(t) {
           if (nr[0] * -cr[0] + nr[1] * -cr[1] + nr[2] * (cam.Fe - cr[2]) <= 0) continue;
           const f0 = front[li][j], f1_ = front[li][j2], b0 = back[li][j], b1 = back[li][j2];
           if (Math.min(f0[3], f1_[3], b0[3], b1[3]) < 30) continue;
-          const base = COL.CR;
+          const base = COL[T.fin.side];
           side.push({ z: (f0[2] + f1_[2] + b0[2] + b1[2]) / 4, d: polyD([f0, f1_, b1, b0]), fill: rgb(shade(base, shadeK(n))), seam: true });
         }
       });
       side.sort((a, b) => a.z - b.z); pool.push(...side);
     }
-    if (front.every((l) => l.every((p) => p[3] > 30))) pool.push({ z: 0, d: front.map((l) => polyD(l)).join(''), fill: rgb(COL.K), seam: false });
+    if (front.every((l) => l.every((p) => p[3] > 30))) pool.push({ z: 0, d: front.map((l) => polyD(l)).join(''), fill: rgb(COL[T.fin.front]), seam: false });
   }
   flush(fn.pool, pool);
   const v = vel((tt) => { const c = makeCam(finCam(tt)); return c.proj([1500, 470, -300]); }, t); setBlur(fn.blur, fn.g, v[0], v[1]);
