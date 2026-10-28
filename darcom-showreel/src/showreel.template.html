@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DAR.COM — showreel</title>
+<meta name="viewport" content="width=1920, height=1080">
+<style>
+@font-face{font-family:"Display";src:url(data:font/woff2;base64,__FONT_B64__) format("woff2");font-weight:100 900;font-display:block}
+html,body{margin:0;background:#0B0B0C;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#0B0B0C;font-family:"Display",sans-serif;-webkit-font-smoothing:antialiased}
+.layer{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;display:none}
+.layer>svg{position:absolute;left:0;top:0}
+.a{position:absolute;white-space:nowrap;line-height:1}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="defs" width="0" height="0" style="position:absolute"></svg>
+<script>
+/* DAR.COM — "THE DOOR" · 15 s · 120 BPM · 1920x1080
+   Everything on screen is a pure function of time: window.seek(t). No CSS animations, no timers, no state between frames.
+   One typeface (Montserrat, variable), three colours (vermilion, cobalt, cream) + black and white. */
+(() => {
+'use strict';
+const G = __GLYPHS__;
+const W = 1920, H = 1080, BEAT = 0.5, UPM = G.upm, CAP = G.capH;
+
+/* ───────────── maths · colour · easing ───────────── */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const f1 = (n) => Math.round(n * 10) / 10, f2 = (n) => Math.round(n * 100) / 100;
+const P = (t, t0, d) => clamp((t - t0) / d);                       // progress 0→1 of a move starting at t0, lasting d
+const eo = (p, k = 6) => (1 - Math.exp(-k * p)) / (1 - Math.exp(-k));       // exponential out  (fast attack on the beat)
+const ei = (p, k = 5) => (Math.exp(k * p) - 1) / (Math.exp(k) - 1);         // exponential in   (push-through)
+const sp = (p, w = 11) => { const f = (x) => 1 - (1 + w * x) * Math.exp(-w * x); return f(p) / f(1); }; // critically damped spring, no overshoot
+const kf = (t, keys, w = 7) => {                                   // spring-eased keyframes [[t, v], …]
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) return lerp(keys[i - 1][1], keys[i][1], sp(P(t, keys[i - 1][0], keys[i][0] - keys[i - 1][0]), w));
+  return keys[keys.length - 1][1];
+};
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const rgb = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+const mixc = (a, b, k) => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * k);
+const COL = { K: hex('#0B0B0C'), W: [255, 255, 255], CR: hex('#F1E9DB'), V: hex('#FF4A1C'), B: hex('#2236FF') };
+const SHADOW = [12, 14, 52];                                         // shadows pick up the cobalt: no muddy greys
+const shade = (c, k) => (k < 0 ? mixc(c, SHADOW, -k) : mixc(c, COL.W, k));
+const deg = (d) => d * Math.PI / 180;
+
+/* ───────────── dom helpers ───────────── */
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const D = (css, parent, text) => { const e = document.createElement('div'); e.style.cssText = css; if (text !== undefined) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const stage = document.getElementById('stage'), defs = document.getElementById('defs');
+const mkLayer = (svg = true) => { const d = D('', stage); d.className = 'layer'; const s = svg ? S('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, d) : null; return { d, s }; };
+const show = (L, on) => { const v = on ? 'block' : 'none'; if (L.d.style.display !== v) L.d.style.display = v; };
+const type = (w, wd = 100, extra = '') => `font-family:Display,sans-serif;font-weight:${w};font-variation-settings:'wght' ${w};${extra}`;
+
+/* motion blur that follows speed AND direction (an SVG blur with separate x / y deviations, set from the velocity) */
+const BLUR_K = 0.0042, BLUR_MAX = 46, blurs = [];
+const mkBlur = (ry = 30) => { const f = S('filter', { id: 'mb' + blurs.length, x: '-30%', y: `-${ry}%`, width: '160%', height: `${100 + 2 * ry}%`, 'color-interpolation-filters': 'sRGB' }, defs); blurs.push(S('feGaussianBlur', { stdDeviation: '0 0' }, f)); return blurs.length - 1; };
+const setBlur = (i, el, vx, vy) => {
+  const sx = Math.min(BLUR_MAX, Math.abs(vx) * BLUR_K), sy = Math.min(BLUR_MAX, Math.abs(vy) * BLUR_K);
+  if (sx + sy < 0.4) { if (el.style.filter) el.style.filter = ''; return; }
+  blurs[i].setAttribute('stdDeviation', `${f2(sx)} ${f2(sy)}`); el.style.filter = `url(#mb${i})`;
+};
+const vel = (fn, t) => { const d = 1 / 75, a = fn(t - d), b = fn(t); return [(b[0] - a[0]) / d, (b[1] - a[1]) / d]; };   // backward difference: zero speed on the very first frame
+
+/* ───────────── glyphs (outlines at two widths, interpolated) ───────────── */
+const glyphAdv = (ch, k) => lerp(G.w62[ch].adv, G.w125[ch].adv, k);
+const glyphD = (ch, k, size) => {
+  const a = G.w62[ch].loops, b = G.w125[ch].loops, s = size / UPM; let d = '';
+  for (let i = 0; i < a.length; i++) { const la = a[i], lb = b[i]; d += 'M'; for (let j = 0; j < la.length; j += 2) d += (j ? 'L' : '') + f1(lerp(la[j], lb[j], k) * s) + ' ' + f1(-lerp(la[j + 1], lb[j + 1], k) * s); d += 'Z'; }
+  return d;
+};
+const layoutWord = (word, ks, size, track) => { const s = size / UPM; let x = 0; const xs = []; for (let i = 0; i < word.length; i++) { xs.push(x); x += (glyphAdv(word[i], ks[i]) + track) * s; } return { xs, total: x - track * s }; };
+const IB = (() => { const bb = (l) => { const xs = l.filter((_, j) => j % 2 === 0), ys = l.filter((_, j) => j % 2 === 1); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }; return { a: bb(G.w62.I.loops[0]), b: bb(G.w125.I.loops[0]) }; })();  // the I is a plain rectangle
+const fitSize = (word, track, maxW, maxSize) => { let u = 0; for (let i = 0; i < word.length; i++) u += G.w125[word[i]].adv + track; return Math.min(maxSize, maxW * UPM / (u - track)); };
+
+/* ───────────── the wordmark: DAR.COM (frame 0 = last frame) ───────────── */
+const KS = 235, ks = KS / UPM, KL = ['D', 'A', 'R', '.', 'C', 'O', 'M'], CAPK = G.capK;
+const KADV = KL.map((c) => G.wK[c].adv);
+let acc = 0; const KXU = KADV.map((a) => { const x = acc; acc += a; return x; }); const KWU = acc;
+const KX0 = (W - KWU * ks) / 2, KBASE = 520 + CAPK * ks / 2, kx = (i) => KX0 + KXU[i] * ks;
+const DOT = (() => {                                              // the period of DAR.COM is a perfect circle: it is the door
+  const L = G.wK['.'].loops[0], xs = L.filter((_, j) => j % 2 === 0), ys = L.filter((_, j) => j % 2 === 1);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return { c: [kx(3) + (x0 + x1) / 2 * ks, KBASE - (y0 + y1) / 2 * ks], r: (x1 - x0) / 2 * ks };
+})();
+const DOT_C = DOT.c, DOT_R = DOT.r, DOT_RP = DOT_R * 2.2;
+const TAG_Y = KBASE + 118, TAG = 'MAISON DE COMMUNICATION', TAG_W = KWU * ks * 1.22;
+const loopsD = (loops, size) => { const s = size / UPM; let d = ''; for (const l of loops) { d += 'M'; for (let j = 0; j < l.length; j += 2) d += (j ? 'L' : '') + f1(l[j] * s) + ' ' + f1(-l[j + 1] * s); d += 'Z'; } return d; };
+const wkD = (ch, size) => loopsD(G.wK[ch].loops, size);
+const tagEl = (parent) => { const e = S('text', { x: f1((W - TAG_W) / 2), y: TAG_Y, textLength: f1(TAG_W), lengthAdjust: 'spacing', fill: rgb(COL.K), style: type(500, 100, 'font-size:44px') }, parent); e.textContent = TAG; return e; };
+
+/* ───────────── layers, in time order ───────────── */
+const LH = mkLayer(), LK = mkLayer(), LM = mkLayer(), LHS = mkLayer(), LUI = mkLayer(false), LST = mkLayer(false), LF = mkLayer();
+
+/* ===================== 1 · HOOK  (0 – 2 s) ===================== */
+const hk = {};
+S('rect', { width: W, height: H, fill: rgb(COL.CR) }, LH.s);
+hk.letters = KL.map((ch) => (ch === '.' ? null : S('path', { d: wkD(ch, KS), fill: rgb(COL.K) }, LH.s)));
+hk.blur = KL.map(() => mkBlur());
+hk.disc = S('circle', { cx: DOT_C[0], cy: DOT_C[1], r: DOT_R, fill: rgb(COL.K) }, LH.s);
+hk.ring = S('circle', { cx: W / 2, cy: H / 2, fill: 'none', stroke: rgb(COL.K), 'stroke-width': 22 }, LH.s);
+hk.dot = S('circle', { cx: W / 2, cy: H / 2, fill: rgb(COL.K) }, LH.s);
+hk.tag = tagEl(LH.s); hk.blurTag = mkBlur(500);
+const HK_LEFT = [720, 940, 1160], HK_RIGHT = [1250, 1150, 1050];
+const hkOff = (i, t) => (i < 3 ? -HK_LEFT[i] : HK_RIGHT[i - 4]) * sp(P(t, 0.02 * i, 0.46), 8);
+function hook(t) {
+  KL.forEach((ch, i) => {
+    if (ch === '.') return;
+    const el = hk.letters[i], x = kx(i) + hkOff(i, t);
+    el.setAttribute('transform', `translate(${f1(x)} ${f1(KBASE)})`);
+    const v = vel((tt) => [hkOff(i, tt), 0], t); setBlur(hk.blur[i], el, v[0], 0);
+  });
+  hk.tag.setAttribute('y', f1(TAG_Y + 520 * sp(P(t, 0, 0.4), 8)));
+  { const v = vel((tt) => [0, 520 * sp(P(tt, 0, 0.4), 8)], t); setBlur(hk.blurTag, hk.tag, 0, v[1]); }
+  hk.disc.setAttribute('fill', rgb(t < 0.0083 ? COL.K : COL.V));        // the dot turns vermilion on the very first beat
+  let r; if (t < 0.5) r = DOT_R * (1 + 1.2 * sp(P(t, 0, 0.5), 9)); else r = DOT_RP * Math.exp(Math.log(1650 / DOT_RP) * sp(P(t, 0.5, 0.5), 7));
+  hk.disc.setAttribute('r', f1(r));
+  const ringOn = t >= 1.0 && t < 1.55; hk.ring.style.display = ringOn ? '' : 'none';
+  if (ringOn) hk.ring.setAttribute('r', f1(8 + 1250 * sp(P(t, 1.0, 0.5), 5)));
+  const rd = t < 1.5 ? 70 * sp(P(t, 1.0, 0.45), 9) : 70 * Math.exp(Math.log(1300 / 70) * sp(P(t, 1.5, 0.5), 7));
+  hk.dot.style.display = t >= 1.0 ? '' : 'none'; hk.dot.setAttribute('r', f1(rd));
+}
+
+/* ===================== 2 · KINETIC TYPE  (2 – 4 s) ===================== */
+const kn = {}; kn.bg = S('rect', { width: W, height: H, fill: rgb(COL.K) }, LK.s);
+const mkWord = (word, parent, fill) => word.split('').map((ch) => S('path', { fill }, parent));
+const WSPEC = { BRAND: 'V', SHOOT: 'CR', POST: 'V', BUILD: 'CR' }, KTRACK = -22;
+const wsize = {}; Object.keys(WSPEC).forEach((w) => { wsize[w] = fitSize(w, KTRACK, 1640, 560); });
+const capPx = (w) => CAP * wsize[w] / UPM, baseOf = (w) => H / 2 + capPx(w) / 2;
+const paintWord = (paths, word, ks_, dy, cx) => {
+  const lay = layoutWord(word, ks_, wsize[word], KTRACK), x0 = cx - lay.total / 2, base = baseOf(word);
+  word.split('').forEach((ch, i) => { paths[i].setAttribute('d', glyphD(ch, ks_[i], wsize[word])); paths[i].setAttribute('transform', `translate(${f1(x0 + lay.xs[i])} ${f1(base + dy[i])})`); });
+  return { lay, x0 };
+};
+// BRAND — rises out of a mask, width 62 → 125
+const clipBrand = S('clipPath', { id: 'cBrand' }, LK.s); kn.clipBrandR = S('rect', { x: 0, width: W }, clipBrand);
+kn.gBrandO = S('g', {}, LK.s); kn.gBrand = S('g', {}, kn.gBrandO); kn.pBrand = mkWord('BRAND', kn.gBrand, rgb(COL.V)); kn.bBrand = mkBlur();
+// SHOOT — splits in: top half from the left, bottom half from the right
+const clipTop = S('clipPath', { id: 'cTop' }, LK.s), clipBot = S('clipPath', { id: 'cBot' }, LK.s); kn.clipTopR = S('rect', { x: 0, y: 0, width: W }, clipTop); kn.clipBotR = S('rect', { x: 0, width: W }, clipBot);
+kn.gTopO = S('g', { 'clip-path': 'url(#cTop)' }, LK.s); kn.gTop = S('g', {}, kn.gTopO); kn.pTop = mkWord('SHOOT', kn.gTop, rgb(COL.CR));
+kn.gBotO = S('g', { 'clip-path': 'url(#cBot)' }, LK.s); kn.gBot = S('g', {}, kn.gBotO); kn.pBot = mkWord('SHOOT', kn.gBot, rgb(COL.CR)); kn.bTop = mkBlur(); kn.bBot = mkBlur();
+// POST — zooms through from 3.4×
+kn.gPost = S('g', {}, LK.s); kn.pPost = mkWord('POST', kn.gPost, rgb(COL.V)); kn.bPost = mkBlur();
+// BUILD — drops in; its cobalt I stretches into the next ground
+kn.gBuild = S('g', {}, LK.s); kn.pBuild = mkWord('BUILD', kn.gBuild, rgb(COL.CR)); kn.pBuild[2].setAttribute('fill', rgb(COL.B)); kn.bBuild = mkBlur();
+kn.flood = S('rect', { fill: rgb(COL.B) }, LK.s);
+const brandY = (i, t) => (1 - sp(P(t, 2.0 + 0.045 * i, 0.42), 9)) * capPx('BRAND') * 1.3;
+const brandEx = (t) => -(baseOf('BRAND') + 300) * sp(P(t, 2.5, 0.34), 10);
+const shootX = (t) => { const a = 1920 * (1 - sp(P(t, 2.5, 0.4), 8)), b = 1920 * sp(P(t, 3.0, 0.32), 10); return [-a + b, a - b]; };
+const postS = (t) => Math.exp(Math.log(3.4) * (1 - sp(P(t, 3.0, 0.45), 9)) + Math.log(9) * sp(P(t, 3.5, 0.3), 9));
+function kinetic(t) {
+  const vis = (el, on) => { el.style.display = on ? '' : 'none'; };
+  // BRAND
+  const onB = t < 2.9; vis(kn.gBrandO, onB);
+  if (onB) {
+    const ksB = [0, 1, 2, 3, 4].map((i) => sp(P(t, 2.0 + 0.045 * i, 0.42), 9)), dyB = [0, 1, 2, 3, 4].map((i) => brandY(i, t));
+    paintWord(kn.pBrand, 'BRAND', ksB, dyB, W / 2);
+    kn.gBrand.setAttribute('transform', `translate(0 ${f1(brandEx(t))})`);
+    if (t < 2.5) { kn.gBrandO.setAttribute('clip-path', 'url(#cBrand)'); kn.clipBrandR.setAttribute('y', f1(baseOf('BRAND') - capPx('BRAND') - 6)); kn.clipBrandR.setAttribute('height', f1(capPx('BRAND') + 12)); } else kn.gBrandO.removeAttribute('clip-path');
+    const v = vel((tt) => [0, brandY(2, tt) + brandEx(tt)], t); setBlur(kn.bBrand, kn.gBrandO, 0, v[1]);
+  }
+  // SHOOT
+  const onS = t >= 2.5 && t < 3.4; vis(kn.gTopO, onS); vis(kn.gBotO, onS);
+  if (onS) {
+    const mid = Math.round(baseOf('SHOOT') - capPx('SHOOT') / 2), ones = [1, 1, 1, 1, 1], zero = [0, 0, 0, 0, 0];
+    kn.clipTopR.setAttribute('height', mid); kn.clipBotR.setAttribute('y', mid); kn.clipBotR.setAttribute('height', H - mid);
+    paintWord(kn.pTop, 'SHOOT', ones, zero, W / 2); paintWord(kn.pBot, 'SHOOT', ones, zero, W / 2);
+    const x = shootX(t); kn.gTop.setAttribute('transform', `translate(${f1(x[0])} 0)`); kn.gBot.setAttribute('transform', `translate(${f1(x[1])} 0)`);
+    const v = vel((tt) => [shootX(tt)[0], 0], t), v2 = vel((tt) => [shootX(tt)[1], 0], t); setBlur(kn.bTop, kn.gTopO, v[0], 0); setBlur(kn.bBot, kn.gBotO, v2[0], 0);
+  }
+  // POST
+  const onP = t >= 3.0 && t < 3.85; vis(kn.gPost, onP);
+  if (onP) {
+    paintWord(kn.pPost, 'POST', [1, 1, 1, 1], [0, 0, 0, 0], W / 2);
+    const s = postS(t); kn.gPost.setAttribute('transform', `translate(${W / 2} ${H / 2}) scale(${s.toFixed(4)}) translate(${-W / 2} ${-H / 2})`);
+    const ds = (postS(t + 0.01) - postS(t - 0.01)) / 0.02 / s; setBlur(kn.bPost, kn.gPost, ds * 220, ds * 220);
+  }
+  // BUILD + the flood
+  const onU = t >= 3.5; vis(kn.gBuild, onU); vis(kn.flood, onU && t >= 3.72);
+  if (onU) {
+    const ksU = [0, 1, 2, 3, 4].map((i) => sp(P(t, 3.5 + 0.02 * i, 0.26), 9)), dyU = ksU.map((k) => -(1 - k) * capPx('BUILD') * 1.7);
+    const { lay, x0 } = paintWord(kn.pBuild, 'BUILD', ksU, dyU, W / 2);
+    const v = vel((tt) => [0, -(1 - sp(P(tt, 3.54, 0.26), 9)) * capPx('BUILD') * 1.7], t); setBlur(kn.bBuild, kn.gBuild, 0, v[1]);
+    if (t >= 3.72) {                                          // the I (a plain rectangle) swallows the frame
+      const s = wsize.BUILD / UPM, kI = ksU[2], bx0 = lerp(IB.a[0], IB.b[0], kI), bx1 = lerp(IB.a[2], IB.b[2], kI), ix = x0 + lay.xs[2] + bx0 * s, iw = (bx1 - bx0) * s, ih = CAP * s, iy = baseOf('BUILD') + dyU[2] - ih;
+      kn.pBuild[2].style.display = 'none';
+      const e1 = sp(P(t, 3.72, 0.14), 9), e2 = sp(P(t, 3.8, 0.2), 8);       // the I first stretches into a column, then sweeps sideways
+      kn.flood.setAttribute('x', f1(lerp(ix, 0, e2))); kn.flood.setAttribute('y', f1(lerp(iy, 0, e1))); kn.flood.setAttribute('width', f1(lerp(iw, W, e2))); kn.flood.setAttribute('height', f1(lerp(ih, H, e1)));
+    } else kn.pBuild[2].style.display = '';
+  }
+}
+
+/* ===================== 3 · SHAPE MORPH  (4 – 6 s) ===================== */
+const mo = {}; S('rect', { width: W, height: H, fill: rgb(COL.B) }, LM.s);
+const circP = (r) => Array.from({ length: 96 }, (_, i) => [Math.cos(i / 96 * 2 * Math.PI) * r, Math.sin(i / 96 * 2 * Math.PI) * r]);
+const rectP = (w, h) => [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
+const triP = (w, h) => [[0, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
+const archP = (w, h) => { const r = w / 2, cy = -h / 2 + r, p = [[-r, h / 2], [r, h / 2], [r, cy]]; for (let i = 1; i < 24; i++) { const a = i / 24 * Math.PI; p.push([r * Math.cos(a), cy - r * Math.sin(a)]); } p.push([-r, cy]); p.corner = [0, 1, 2, p.length - 1]; return p; };
+const SHP = {
+  A: [circP(140), rectP(280, 280), triP(340, 300), triP(640, 230)],
+  B: [circP(140), triP(340, 300), archP(220, 330), archP(150, 230)],
+  C: [circP(140), archP(220, 330), rectP(280, 280), rectP(520, 340)],
+};
+const HOUSE = { body: [960, 650], roof: [960, 365], door: [960, 705] };           // house elevation (centres), shared with the 3D scene
+const SLOT = { A: [[520, 540], [520, 540], [520, 540], HOUSE.roof], B: [[960, 540], [960, 540], [960, 540], HOUSE.door], C: [[1400, 540], [1400, 540], [1400, 540], HOUSE.body] };
+const SCOL = { A: ['V', 'CR', 'V', 'V'], B: ['CR', 'V', 'K', 'K'], C: ['K', 'K', 'CR', 'CR'] };
+const ROT = { A: [0, -32, 32, -20], B: [0, 32, -32, 20], C: [0, -32, 32, -14] };
+const rayHit = (poly, a) => { const dx = Math.cos(a), dy = Math.sin(a); let best = Infinity; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], ex = q[0] - p[0], ey = q[1] - p[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue; const tt = (p[0] * ey - p[1] * ex) / den, uu = (p[0] * dy - p[1] * dx) / den; if (tt > 1e-6 && uu >= -1e-9 && uu <= 1 + 1e-9 && tt < best) best = tt; } return best; };
+const ANG = (() => {                                            // a dense uniform fan of angles + the exact corners (the arcs need no extra samples)
+  const set = []; for (let i = 0; i < 720; i++) set.push(i / 720 * 2 * Math.PI - Math.PI);
+  Object.values(SHP).flat().forEach((poly) => { const idx = poly.corner || (poly.length < 10 ? poly.map((_, i) => i) : []); idx.forEach((i) => set.push(Math.atan2(poly[i][1], poly[i][0]))); });
+  set.sort((x, y) => x - y); const out = [set[0]]; for (let i = 1; i < set.length; i++) if (set[i] - out[out.length - 1] > 1e-7) out.push(set[i]); return out;
+})();
+const RAD = {}; Object.keys(SHP).forEach((k) => { RAD[k] = SHP[k].map((poly) => ANG.map((a) => rayHit(poly, a))); });
+// body first, so the door sits on top of it
+mo.paths = {}; ['C', 'A', 'B'].forEach((k) => { mo.paths[k] = S('path', {}, LM.s); });
+mo.blur = { A: mkBlur(), B: mkBlur(), C: mkBlur() };
+function morphState(k, t) {
+  const w = [1, 2, 3].map((m) => sp(P(t, 4.0 + 0.5 * m, 0.42), 9)), u = w[0] + w[1] + w[2], i0 = Math.min(2, Math.floor(u + 1e-9)), fr = clamp(u - i0);
+  const m = i0 + 1, wm = w[m - 1], rotA = deg(ROT[k][m]) * (1 - wm);
+  const ra = RAD[k][i0], rb = RAD[k][Math.min(3, i0 + 1)], pa = SLOT[k][i0], pb = SLOT[k][Math.min(3, i0 + 1)];
+  const intro = sp(P(t, 4.0 + 0.05 * 'ABC'.indexOf(k), 0.42), 9), from = [W / 2, H / 2];
+  const c0 = [lerp(pa[0], pb[0], fr), lerp(pa[1], pb[1], fr)], c = [lerp(from[0], c0[0], intro), lerp(from[1], c0[1], intro)];
+  const col = COL[SCOL[k][fr < 0.5 ? i0 : Math.min(3, i0 + 1)]];                  // colours swap crisply mid-morph: the palette stays pure
+  return { ra, rb, fr, c, rot: rotA, col, sc: intro, wm: wm };
+}
+function morph(t) {
+  for (const k of ['A', 'B', 'C']) {
+    const s = morphState(k, t); let d = '';
+    let rr = ANG.map((_, i) => lerp(s.ra[i], s.rb[i], s.fr));
+    const K = Math.round(18 * Math.pow(Math.sin(Math.PI * clamp(s.wm)), 0.8));  // in-between shapes are smoothed (moving average); the end shapes stay exact
+    if (K > 0) { const n = rr.length, out = new Array(n); for (let i = 0; i < n; i++) { let acc2 = 0; for (let j = -K; j <= K; j++) acc2 += rr[(i + j + n) % n]; out[i] = acc2 / (2 * K + 1); } rr = out; }
+    for (let i = 0; i < ANG.length; i++) { const r = rr[i] * s.sc, a = ANG[i] + s.rot; d += (i ? 'L' : 'M') + f1(s.c[0] + r * Math.cos(a)) + ' ' + f1(s.c[1] + r * Math.sin(a)); }
+    mo.paths[k].setAttribute('d', d + 'Z'); mo.paths[k].setAttribute('fill', rgb(s.col));
+    const v = vel((tt) => morphState(k, tt).c, t); setBlur(mo.blur[k], mo.paths[k], v[0], v[1]);
+  }
+}
+
+/* ===================== tiny 3D (painter's algorithm, flat shading) ===================== */
+const FOC = 1800, LDIR = (() => { const v = [-0.35, -0.7, 0.62], n = Math.hypot(...v); return v.map((x) => x / n); })();
+const shadeK = (n) => clamp((n[0] * LDIR[0] + n[1] * LDIR[1] + n[2] * LDIR[2] - LDIR[2]) * 1.05, -0.5, 0.12);   // front face = its own colour
+const makeCam = (c) => {
+  const cy = Math.cos(c.ry), sy = Math.sin(c.ry), cx = Math.cos(c.rx), sx = Math.sin(c.rx), Fe = FOC - c.dolly;
+  const rot = (x, y, z) => { const x1 = x * cy + z * sy, z1 = -x * sy + z * cy; return [x1, y * cx - z1 * sx, y * sx + z1 * cx]; };
+  const toCam = (p) => rot(p[0] - c.px, p[1] - c.py, p[2] - c.pz);
+  const scr = (r) => { const den = Fe - r[2], s = FOC / den; return [W / 2 + r[0] * s, H / 2 + r[1] * s, r[2], den]; };
+  return { rot, toCam, scr, proj: (p) => scr(toCam(p)), Fe, c };
+};
+const mkPool = (parent) => ({ parent, els: [], used: 0 });
+const flush = (pool, items) => {
+  for (let i = 0; i < items.length; i++) {
+    let el = pool.els[i]; if (!el) { el = S('path', { 'stroke-linejoin': 'round' }, pool.parent); pool.els.push(el); }
+    const it = items[i]; el.setAttribute('d', it.d); el.setAttribute('fill', it.fill);
+    if (it.seam) { el.setAttribute('stroke', it.fill); el.setAttribute('stroke-width', 0.9); } else el.removeAttribute('stroke');
+    if (i >= pool.used) el.style.display = '';
+  }
+  for (let i = items.length; i < pool.used; i++) pool.els[i].style.display = 'none';
+  pool.used = items.length;
+};
+const polyD = (pts) => 'M' + pts.map((p) => f1(p[0]) + ' ' + f1(p[1])).join('L') + 'Z';
+const NEAR = 40;
+const clipNear = (rs, Fe) => {                                       // Sutherland–Hodgman against the near plane (camera space)
+  const out = [];
+  for (let i = 0; i < rs.length; i++) {
+    const a = rs[i], b = rs[(i + 1) % rs.length], da = Fe - a[2] - NEAR, db = Fe - b[2] - NEAR;
+    if (da >= 0) out.push(a);
+    if ((da >= 0) !== (db >= 0)) { const k = da / (da - db); out.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]); }
+  }
+  return out;
+};
+// faces: {pts:[[x,y,z]…], n:[nx,ny,nz], col:[r,g,b], flat?:true (no shading)} → draw items, far to near
+function faceItems(cam, faces) {
+  const items = [];
+  for (const f of faces) {
+    const nr = cam.rot(f.n[0], f.n[1], f.n[2]); let cx = 0, cy = 0, cz = 0; for (const p of f.pts) { cx += p[0]; cy += p[1]; cz += p[2]; } const q = 1 / f.pts.length;
+    const cr = cam.rot(cx * q - cam.c.px, cy * q - cam.c.py, cz * q - cam.c.pz);
+    if (nr[0] * -cr[0] + nr[1] * -cr[1] + nr[2] * (cam.Fe - cr[2]) <= 0) continue;
+    const cl = clipNear(f.pts.map((p) => cam.toCam(p)), cam.Fe); if (cl.length < 3) continue;
+    const pp = cl.map((r) => cam.scr(r));
+    items.push({ z: cr[2], d: polyD(pp), fill: rgb(f.flat ? f.col : shade(f.col, shadeK(f.n))), seam: true });
+  }
+  items.sort((a, b) => a.z - b.z); return items;
+}
+const boxFaces = (x0, x1, y0, y1, zf, zb, col, skip = '') => {
+  const f = [{ pts: [[x0, y0, zf], [x1, y0, zf], [x1, y1, zf], [x0, y1, zf]], n: [0, 0, 1], col, flat: true, id: 'f' },
+    { pts: [[x0, y0, zb], [x1, y0, zb], [x1, y1, zb], [x0, y1, zb]], n: [0, 0, -1], col, id: 'b' },
+    { pts: [[x0, y0, zf], [x0, y0, zb], [x0, y1, zb], [x0, y1, zf]], n: [-1, 0, 0], col, id: 'l' },
+    { pts: [[x1, y0, zf], [x1, y0, zb], [x1, y1, zb], [x1, y1, zf]], n: [1, 0, 0], col, id: 'r' },
+    { pts: [[x0, y0, zf], [x1, y0, zf], [x1, y0, zb], [x0, y0, zb]], n: [0, -1, 0], col, id: 't' },
+    { pts: [[x0, y1, zf], [x1, y1, zf], [x1, y1, zb], [x0, y1, zb]], n: [0, 1, 0], col, id: 'u' }];
+  return f.filter((x) => !skip.includes(x.id));
+};
+
+/* ===================== 4 · 2D → 3D  (6 – 8 s) ===================== */
+const hs = {}; S('rect', { width: W, height: H, fill: rgb(COL.B) }, LHS.s);
+hs.g = S('g', {}, LHS.s); hs.pool = mkPool(hs.g); hs.blur = mkBlur();
+const DOOR = archP(150, 230).map((p) => [p[0] + HOUSE.door[0], p[1] + HOUSE.door[1], 0.6]);
+const houseCam = (t) => ({
+  px: 960, py: lerp(540, 700, eo(P(t, 7.0, 1.0), 3)), pz: 0,
+  ry: deg(kf(t, [[6.0, 0], [6.55, -34], [7.0, 26], [7.45, 0]])), rx: -deg(kf(t, [[6.0, 0], [6.55, 16], [7.0, 8], [7.45, 0]])),
+  dolly: t < 7.5 ? 200 * sp(P(t, 6.55, 0.45), 9) + 450 * sp(P(t, 7.0, 0.5), 9) : FOC - FOC / Math.exp(lerp(Math.log(1800 / 1150), Math.log(20), ei(P(t, 7.5, 0.5), 2.2))),
+});
+function house(t) {
+  const dep = 420 * sp(P(t, 6.0, 0.45), 9), wing = 230 * sp(P(t, 6.5, 0.4), 9), cam = makeCam(houseCam(t)), zb = -dep, rb = -dep - 60;
+  const faces = [];
+  faces.push({ pts: [[-9000, 820, 900], [10900, 820, 900], [10900, 820, -14000], [-9000, 820, -14000]], n: [0, -1, 0], col: shade(COL.B, -0.3), flat: true, floor: true });
+  if (dep > 0.5) faces.push(...boxFaces(700, 1220, 480, 820, 0, zb, COL.CR, 'u'));
+  else faces.push(...boxFaces(700, 1220, 480, 820, 0, -0.5, COL.CR, 'u').filter((x) => x.id === 'f'));
+  faces.push({ pts: [[640, 480, 0], [1280, 480, 0], [960, 250, 0]], n: [0, 0, 1], col: COL.V, flat: true });
+  if (dep > 0.5) {
+    faces.push({ pts: [[640, 480, rb], [1280, 480, rb], [960, 250, rb]], n: [0, 0, -1], col: COL.V });
+    faces.push({ pts: [[640, 480, 0], [960, 250, 0], [960, 250, rb], [640, 480, rb]], n: [-0.584, -0.812, 0], col: COL.V });
+    faces.push({ pts: [[1280, 480, 0], [960, 250, 0], [960, 250, rb], [1280, 480, rb]], n: [0.584, -0.812, 0], col: COL.V });
+  }
+  faces.push({ pts: DOOR, n: [0, 0, 1], col: COL.K, flat: true });
+  if (wing > 0.5) faces.push(...boxFaces(1224, 1544, 820 - wing, 820, -60, -380, COL.V, 'u'));
+  // the floor is always drawn first, the rest far to near
+  const floor = faces.filter((f) => f.floor), rest = faces.filter((f) => !f.floor);
+  const items = faceItems(cam, floor).concat(faceItems(cam, rest)); flush(hs.pool, items);
+  const v = vel((tt) => { const c = makeCam(houseCam(tt)); return c.proj([1220, 480, -200]); }, t); setBlur(hs.blur, hs.g, v[0], v[1]);
+}
+
+/* ===================== 5 · DATA / UI  (8 – 10 s) ===================== */
+const ui = {}; LUI.d.style.background = rgb(COL.K);
+const SERVICES = ['BRANDING & DESIGN', 'PHOTO & VIDEO', 'DIGITAL COMMUNICATION', '3D & MOTION', 'BOUTIQUE & LIFESTYLE', 'CAFÉ & SWEETS'];
+const CARD = { x: 180, y: 120, w: 1560, h: 840 }, ROW0 = 150, ROWH = 100, TOG = { x: 830, w: 128, h: 64 };
+ui.card = D(`left:${CARD.x}px;top:${CARD.y}px;width:${CARD.w}px;height:${CARD.h}px;position:absolute;background:${rgb(COL.CR)};border-radius:44px;overflow:hidden`, LUI.d);
+D(`position:absolute;left:56px;top:46px;color:${rgb(COL.K)};font-size:38px;line-height:1;letter-spacing:0.01em;${type(800)}`, ui.card, 'DAR.COM');
+D(`position:absolute;right:56px;top:42px;height:52px;padding:0 26px;border-radius:26px;background:${rgb(COL.K)};color:${rgb(COL.CR)};font-size:22px;line-height:52px;letter-spacing:0.14em;${type(700, 110)}`, ui.card, 'SERVICES');
+ui.rows = SERVICES.map((name, i) => {
+  const y = ROW0 + ROWH * i, row = D(`position:absolute;left:0;top:${y}px;width:${CARD.w}px;height:${ROWH}px`, ui.card);
+  D(`position:absolute;left:56px;right:56px;top:0;height:2px;background:rgba(11,11,12,0.12)`, row);
+  D(`position:absolute;left:56px;top:34px;color:${rgb(COL.V)};font-size:30px;line-height:1;${type(800, 110)}`, row, String(i + 1).padStart(2, '0'));
+  D(`position:absolute;left:150px;top:32px;color:${rgb(COL.K)};font-size:36px;line-height:1;letter-spacing:0;${type(700)}`, row, name);
+  const track = D(`position:absolute;left:${TOG.x}px;top:${(ROWH - TOG.h) / 2}px;width:${TOG.w}px;height:${TOG.h}px;border-radius:32px`, row), knob = D(`position:absolute;top:6px;width:52px;height:52px;border-radius:26px;background:#fff`, track);
+  return { row, track, knob };
+});
+D(`position:absolute;left:1000px;top:${ROW0}px;width:504px;height:620px;border-radius:32px;background:${rgb(COL.K)}`, ui.card);
+const BAR = { x0: CARD.x + 1000 + 20, base: CARD.y + ROW0 + 570, w: 54, gap: 28, hmax: 460, hs: [0.55, 0.82, 0.46, 0.96, 0.7, 0.62] };
+const STRIPE_COL = ['B', 'CR', 'V', 'K', 'B', 'CR'];
+ui.bars = BAR.hs.map((h, i) => D(`position:absolute;border-radius:6px`, LUI.d));
+ui.cur = S('svg', { width: 80, height: 80, viewBox: '0 0 80 80', style: 'position:absolute;left:0;top:0;overflow:visible' }, LUI.d);
+ui.curP = S('path', { d: 'M4 4L4 52L17 40L26 62L36 58L27 36L45 36Z', fill: '#fff', stroke: rgb(COL.K), 'stroke-width': 4, 'stroke-linejoin': 'round' }, ui.cur);
+ui.blurCard = mkBlur();
+const togY = (i) => CARD.y + ROW0 + ROWH * i + ROWH / 2, togX = CARD.x + TOG.x + TOG.w / 2;
+const TON = [8.50, 8.57, 8.64, 9.00, 9.07, 9.14];
+const curPos = (t) => [kf(t, [[8.3, 1560], [TON[0], togX], [TON[1], togX], [TON[2], togX], [TON[3], togX], [TON[4], togX], [TON[5], togX], [9.45, togX + 90]], 10),
+  kf(t, [[8.3, 1020], [TON[0], togY(0)], [TON[1], togY(1)], [TON[2], togY(2)], [TON[3], togY(3)], [TON[4], togY(4)], [TON[5], togY(5)], [9.45, togY(5) + 60]], 10)];
+const cardDy = (t) => 1180 * (1 - sp(P(t, 8.0, 0.45), 8)) + 1250 * sp(P(t, 9.5, 0.34), 9);
+function uiScene(t) {
+  const dy = cardDy(t); ui.card.style.transform = `translateY(${f1(dy)}px)`;
+  const v = vel((tt) => [0, cardDy(tt)], t); setBlur(ui.blurCard, ui.card, 0, v[1]);
+  ui.rows.forEach((r, i) => {
+    const slide = 1 - sp(P(t, 8.12 + 0.045 * i, 0.4), 9); r.row.style.transform = `translateX(${f1(-160 * slide)}px)`; r.row.style.opacity = slide > 0.99 ? 0 : 1;
+    const q = sp(P(t, TON[i], 0.2), 10);
+    r.track.style.background = rgb(mixc(hex('#D9D0BF'), COL.V, q)); r.knob.style.left = f1(6 + (TOG.w - 64) * q) + 'px';
+  });
+  const m = sp(P(t, 9.52, 0.44), 8);
+  ui.bars.forEach((b, i) => {
+    const grow = sp(P(t, TON[i] + 0.03, 0.3), 9), x = BAR.x0 + i * (BAR.w + BAR.gap), h = BAR.hs[i] * BAR.hmax * grow;
+    const r0 = [x, BAR.base - h - dy * 0, BAR.w, h], r1 = [i * 320, 0, 320, H];
+    const rr = r0.map((v0, j) => lerp(v0, r1[j], m)), cardShift = m < 1 ? dy * (1 - m) : 0;
+    const c0 = i % 2 ? COL.CR : COL.V, c1 = COL[STRIPE_COL[i]];
+    b.style.left = f1(rr[0]) + 'px'; b.style.top = f1(rr[1] + cardShift) + 'px'; b.style.width = f1(rr[2]) + 'px'; b.style.height = f1(Math.max(0, rr[3])) + 'px';
+    b.style.borderRadius = f1(6 * (1 - m)) + 'px'; b.style.background = rgb(m > 0.12 ? c1 : c0); b.style.display = h < 0.5 && m < 0.01 ? 'none' : '';
+  });
+  const c = curPos(t), press = Math.max(...TON.map((tt) => Math.max(0, 1 - Math.abs(t - tt) / 0.07))), on = t >= 8.3 && t < 9.6;
+  ui.cur.style.display = on ? '' : 'none'; ui.cur.style.transform = `translate(${f1(c[0] - 4 + 0)}px,${f1(c[1] - 4 + dy * (t > 9.5 ? 1 : 0))}px) scale(${(1 - 0.12 * press).toFixed(3)})`;
+}
+
+/* ===================== 6 · THE RISER  (10 – 12 s) — type stripes ===================== */
+const st = { cols: [] };
+const STRIPES = [['BRANDING', 'B', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'V', 'K'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'B', 'CR'], ['CAFÉ', 'CR', 'V']];
+STRIPES.forEach(([word, bg, fg], i) => {
+  const w = D(`position:absolute;left:${i * 320}px;top:0;width:320px;height:${H}px;overflow:hidden;background:${rgb(COL[bg])}`, LST.d);
+  const unit = word + '   /   ', strip = D(`position:absolute;left:0;top:0;white-space:nowrap;height:320px;line-height:320px;color:${rgb(COL[fg])};font-size:250px;transform-origin:0 0;${type(900, 100)}`, w, unit.repeat(8));
+  const probe = D(`position:absolute;visibility:hidden;white-space:nowrap;font-size:250px;line-height:1;${type(900, 100)}`, LST.d, unit);
+  st.cols.push({ w, strip, probe, unit: 0, blur: mkBlur() });
+});
+st.disc = D(`position:absolute;left:0;top:0;border-radius:50%;background:${rgb(COL.V)};display:none`, LST.d);
+const scrollOff = (t) => { const a = Math.max(0, t - 10); return 520 * a + 190 * a ** 4 + 0; };
+const stripeOff = (i, t) => (i % 2 ? 1 : -1) * scrollOff(t) + (i % 2 ? -1 : 1) * 1500 * (1 - sp(P(t, 10.0 + 0.05 * i, 0.45), 9));
+function stripes(t) {
+  st.cols.forEach((c, i) => {
+    if (!c.unit) c.unit = c.strip.offsetWidth / 8;                         // the exact period of the repeated word
+    const off = stripeOff(i, t), per = c.unit, m = ((off % per) + per) % per;
+    c.strip.style.transform = `translate(0px,${f1(H + m)}px) rotate(-90deg) translate(${f1(-per + 40)}px,${f1(0)}px)`;
+    const v = vel((tt) => [0, stripeOff(i, tt)], t); setBlur(c.blur, c.w, 0, v[1]);
+  });
+  const rp = P(t, 11.5, 0.5); st.disc.style.display = rp > 0 ? '' : 'none';
+  const r = 1160 * ei(rp, 4.2); st.disc.style.width = st.disc.style.height = f1(2 * r) + 'px'; st.disc.style.left = f1(W / 2 - r) + 'px'; st.disc.style.top = f1(H / 2 - r) + 'px';
+}
+
+/* ===================== 7 · STRONGEST MOMENT + 8 · END TITLE  (12 – 15 s) ===================== */
+const fn = {}; S('rect', { width: W, height: H, fill: rgb(COL.CR) }, LF.s);
+fn.ground = S('circle', { cx: DOT_C[0], cy: DOT_C[1] }, LF.s);
+fn.g = S('g', {}, LF.s); fn.pool = mkPool(fn.g); fn.blur = mkBlur();
+fn.tag = tagEl(LF.s); fn.blurTag = mkBlur(500);
+// letter geometry in world px (y down, z toward the viewer): front at z = 0, extruded backwards
+const orient = (loop) => { let a = 0; for (let i = 0; i < loop.length; i++) { const p = loop[i], q = loop[(i + 1) % loop.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+const FL = KL.map((ch, i) => {
+  if (ch === '.') { const circ = Array.from({ length: 72 }, (_, j) => [DOT_C[0] + DOT_R * Math.cos(j / 72 * 2 * Math.PI), DOT_C[1] + DOT_R * Math.sin(j / 72 * 2 * Math.PI)]); return { ch, i, loops: [circ], sgn: 1, cx: DOT_C[0], disc: true }; }
+  const loops = G.wK[ch].loops.map((l) => { const o = []; for (let j = 0; j < l.length; j += 2) o.push([kx(i) + l[j] * ks, KBASE - l[j + 1] * ks]); return o; });
+  const outer = loops.reduce((m, l) => (Math.abs(orient(l)) > Math.abs(orient(m)) ? l : m)), sgn = Math.sign(orient(outer));
+  return { ch, i, loops, sgn, cx: kx(i) + KADV[i] * ks / 2 };
+});
+const DMAX = 640, RISE = { D: 12.0, A: 12.06, R: 12.5, '.': 12.56, C: 13.0, O: 13.06, M: 13.12 };
+const depthOf = (ch, t) => DMAX * sp(P(t, RISE[ch], 0.45), 9) * (1 - sp(P(t, 14.0, 0.5), 8));
+const finCam = (t) => ({
+  px: 960, py: 540, pz: 0,
+  ry: deg(kf(t, [[12.0, -52], [12.5, -8], [13.0, 44], [13.5, 12], [14.0, 0]], 6.5)), rx: -deg(kf(t, [[12.0, 42], [12.5, 30], [13.0, 16], [13.5, 26], [14.0, 0]], 6.5)),
+  dolly: kf(t, [[12.0, 300], [12.5, 620], [13.0, 380], [13.5, 760], [14.0, 0]], 6.5),
+});
+function finale(t) {
+  // ground: the vermilion disc that grew out of the dot shrinks back into it (the hook, played backwards)
+  const gr = t < 14.0 ? 1650 : t < 14.5 ? DOT_RP * Math.exp(Math.log(1650 / DOT_RP) * (1 - sp(P(t, 14.0, 0.5), 7))) : DOT_R * (1 + 1.2 * (1 - sp(P(t, 14.5, 0.5), 9)));
+  fn.ground.setAttribute('r', f1(gr)); fn.ground.setAttribute('fill', rgb(COL.V));
+  fn.tag.setAttribute('y', f1(TAG_Y + 520 * (1 - sp(P(t, 14.5, 0.4), 8))));
+  { const v = vel((tt) => [0, 520 * (1 - sp(P(tt, 14.5, 0.4), 8))], t); setBlur(fn.blurTag, fn.tag, 0, v[1]); }
+  const cam = makeCam(finCam(t)), pool = [];
+  const order = FL.map((L) => ({ L, z: cam.rot(L.cx - cam.c.px, KBASE - cam.c.py, 0 - cam.c.pz)[2] })).sort((a, b) => a.z - b.z);
+  for (const { L } of order) {
+    const d = depthOf(L.ch, t), front = L.loops.map((l) => l.map((p) => cam.proj([p[0], p[1], 0])));
+    if (d > 0.6) {
+      const back = L.loops.map((l) => l.map((p) => cam.proj([p[0], p[1], -d]))), side = [];
+      L.loops.forEach((l, li) => {
+        for (let j = 0; j < l.length; j++) {
+          const j2 = (j + 1) % l.length, a = l[j], b = l[j2], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, n = [L.sgn * dy / len, -L.sgn * dx / len, 0];
+          const nr = cam.rot(n[0], n[1], 0), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, cr = cam.rot(mx - cam.c.px, my - cam.c.py, -d / 2 - cam.c.pz);
+          if (nr[0] * -cr[0] + nr[1] * -cr[1] + nr[2] * (cam.Fe - cr[2]) <= 0) continue;
+          const f0 = front[li][j], f1_ = front[li][j2], b0 = back[li][j], b1 = back[li][j2];
+          if (Math.min(f0[3], f1_[3], b0[3], b1[3]) < 30) continue;
+          const base = COL.CR;
+          side.push({ z: (f0[2] + f1_[2] + b0[2] + b1[2]) / 4, d: polyD([f0, f1_, b1, b0]), fill: rgb(shade(base, shadeK(n))), seam: true });
+        }
+      });
+      side.sort((a, b) => a.z - b.z); pool.push(...side);
+    }
+    if (front.every((l) => l.every((p) => p[3] > 30))) pool.push({ z: 0, d: front.map((l) => polyD(l)).join(''), fill: rgb(COL.K), seam: false });
+  }
+  flush(fn.pool, pool);
+  const v = vel((tt) => { const c = makeCam(finCam(tt)); return c.proj([1500, 470, -300]); }, t); setBlur(fn.blur, fn.g, v[0], v[1]);
+}
+
+/* ───────────── the clock ───────────── */
+const SCENES = [[LH, 0, 2], [LK, 2, 4], [LM, 4, 6], [LHS, 6, 8], [LUI, 8, 10], [LST, 10, 12], [LF, 12, 15.0001]];
+window.seek = (t) => {
+  t = clamp(t, 0, 15);
+  SCENES.forEach(([L, a, b]) => show(L, t >= a && t < b));
+  if (t < 2) hook(t); else if (t < 4) kinetic(t); else if (t < 6) morph(t); else if (t < 8) house(t); else if (t < 10) uiScene(t); else if (t < 12) stripes(t); else finale(t);
+  return true;
+};
+window.__ready = document.fonts.load("900 100px Display").then(() => document.fonts.ready).then(() => { window.seek(0); return true; });
+__AUDIO__
+})();
+</script>
+</body>
+</html>
