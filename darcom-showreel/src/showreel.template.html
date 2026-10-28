@@ -48,7 +48,7 @@ const RED = {                                                    // Sunshine, Su
   hook: { flood: 'V' },
   kin: { ground: 'K', BRAND: 'CR', SHOOT: 'V', POST: 'CR', BUILD: 'V', I: 'CR' },        // the I floods the next ground
   morph: { ground: 'CR', A: ['B', 'V', 'B', 'B'], B: ['K', 'B', 'K', 'K'], C: ['V', 'K', 'V', 'V'] },
-  house: { ground: 'CR', floor: 0.2, body: 'V', roof: 'B', door: 'K', wing: 'B' },
+  portal: { ground: 'CR', floor: 0.2, outer: 'V', mid: 'B', door: 'K', wing: 'B' },
   ui: { ground: 'K', card: 'CR', ink: 'K', toggle: 'V', panel: 'K', bars: ['V', 'CR'], stripes: ['B', 'CR', 'V', 'K', 'B', 'CR'] },
   stripes: [['BRANDING', 'B', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'V', 'CR'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'B', 'CR'], ['CAFÉ', 'CR', 'V']],
   fin: { ground: 'V', front: 'K', side: 'CR' }, shadow: ['K', 'B', 0.4],
@@ -62,7 +62,7 @@ const THEMES = {
     hook: { flood: 'V' },
     kin: { ground: 'K', BRAND: 'CR', SHOOT: 'B', POST: 'CR', BUILD: 'B', I: 'V' },
     morph: { ground: 'V', A: ['CR', 'B', 'B', 'B'], B: ['B', 'CR', 'CR', 'K'], C: ['CR', 'B', 'CR', 'CR'] },
-    house: { ground: 'V', floor: 0.3, body: 'CR', roof: 'B', door: 'K', wing: 'B' },
+    portal: { ground: 'V', floor: 0.3, outer: 'CR', mid: 'B', door: 'K', wing: 'B' },
     ui: { ground: 'K', card: 'CR', ink: 'K', toggle: 'V', panel: 'K', bars: ['B', 'CR'], stripes: ['V', 'CR', 'B', 'K', 'V', 'CR'] },
     stripes: [['BRANDING', 'V', 'CR'], ['PHOTO · VIDEO', 'CR', 'K'], ['DIGITAL', 'B', 'K'], ['3D · MOTION', 'K', 'CR'], ['BOUTIQUE', 'V', 'B'], ['CAFÉ', 'CR', 'V']],
     fin: { ground: 'B', front: 'K', side: 'V' }, shadow: ['K', 'V', 0.3],
@@ -227,13 +227,15 @@ const circP = (r) => Array.from({ length: 96 }, (_, i) => [Math.cos(i / 96 * 2 *
 const rectP = (w, h) => [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
 const triP = (w, h) => [[0, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
 const archP = (w, h) => { const r = w / 2, cy = -h / 2 + r, p = [[-r, h / 2], [r, h / 2], [r, cy]]; for (let i = 1; i < 24; i++) { const a = i / 24 * Math.PI; p.push([r * Math.cos(a), cy - r * Math.sin(a)]); } p.push([-r, cy]); p.corner = [0, 1, 2, p.length - 1]; return p; };
-const SHP = {
-  A: [circP(140), rectP(280, 280), triP(340, 300), triP(640, 230)],
-  B: [circP(140), triP(340, 300), archP(220, 330), archP(150, 230)],
-  C: [circP(140), archP(220, 330), rectP(280, 280), rectP(520, 340)],
+const FLOOR = 820;                                                                   // the baseline every arch stands on (shared with the 3D scene)
+const ARCH = { outer: [480, 600], mid: [340, 470], door: [200, 330] };               // the portal: three nested arches (width, height)
+const PORTAL = Object.fromEntries(Object.entries(ARCH).map(([k, [w, h]]) => [k, [960, FLOOR - h / 2]]));   // their bounding-box centres
+const SHP = {                                                                       // each slot cycles square / triangle / arch, then locks into one arch of the portal
+  A: [circP(140), rectP(280, 280), triP(340, 300), archP(...ARCH.mid)],
+  B: [circP(140), triP(340, 300), archP(220, 330), archP(...ARCH.door)],
+  C: [circP(140), archP(220, 330), rectP(280, 280), archP(...ARCH.outer)],
 };
-const HOUSE = { body: [960, 650], roof: [960, 365], door: [960, 705] };           // house elevation (centres), shared with the 3D scene
-const SLOT = { A: [[520, 540], [520, 540], [520, 540], HOUSE.roof], B: [[960, 540], [960, 540], [960, 540], HOUSE.door], C: [[1400, 540], [1400, 540], [1400, 540], HOUSE.body] };
+const SLOT = { A: [[520, 540], [520, 540], [520, 540], PORTAL.mid], B: [[960, 540], [960, 540], [960, 540], PORTAL.door], C: [[1400, 540], [1400, 540], [1400, 540], PORTAL.outer] };
 const SCOL = { A: T.morph.A, B: T.morph.B, C: T.morph.C };
 const ROT = { A: [0, -32, 32, -20], B: [0, 32, -32, 20], C: [0, -32, 32, -14] };
 const rayHit = (poly, a) => { const dx = Math.cos(a), dy = Math.sin(a); let best = Infinity; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], ex = q[0] - p[0], ey = q[1] - p[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue; const tt = (p[0] * ey - p[1] * ex) / den, uu = (p[0] * dy - p[1] * dx) / den; if (tt > 1e-6 && uu >= -1e-9 && uu <= 1 + 1e-9 && tt < best) best = tt; } return best; };
@@ -243,7 +245,7 @@ const ANG = (() => {                                            // a dense unifo
   set.sort((x, y) => x - y); const out = [set[0]]; for (let i = 1; i < set.length; i++) if (set[i] - out[out.length - 1] > 1e-7) out.push(set[i]); return out;
 })();
 const RAD = {}; Object.keys(SHP).forEach((k) => { RAD[k] = SHP[k].map((poly) => ANG.map((a) => rayHit(poly, a))); });
-// body first, so the door sits on top of it
+// the outer arch first, so the smaller ones sit on top of it
 mo.paths = {}; ['C', 'A', 'B'].forEach((k) => { mo.paths[k] = S('path', {}, LM.s); });
 mo.blur = { A: mkBlur(), B: mkBlur(), C: mkBlur() };
 function morphState(k, t) {
@@ -308,7 +310,7 @@ function faceItems(cam, faces) {
     if (nr[0] * -cr[0] + nr[1] * -cr[1] + nr[2] * (cam.Fe - cr[2]) <= 0) continue;
     const cl = clipNear(f.pts.map((p) => cam.toCam(p)), cam.Fe); if (cl.length < 3) continue;
     const pp = cl.map((r) => cam.scr(r));
-    items.push({ z: cr[2], d: polyD(pp), fill: rgb(f.flat ? f.col : shade(f.col, shadeK(f.n))), seam: true });
+    items.push({ z: cr[2] + (f.bias || 0), d: polyD(pp), fill: rgb(f.flat ? f.col : shade(f.col, shadeK(f.n))), seam: true });
   }
   items.sort((a, b) => a.z - b.z); return items;
 }
@@ -323,32 +325,53 @@ const boxFaces = (x0, x1, y0, y1, zf, zb, col, skip = '') => {
 };
 
 /* ===================== 4 · 2D → 3D  (6 – 8 s) ===================== */
-const hs = {}; S('rect', { width: W, height: H, fill: rgb(COL[T.house.ground]) }, LHS.s);
+const hs = {}; S('rect', { width: W, height: H, fill: rgb(COL[T.portal.ground]) }, LHS.s);
 hs.g = S('g', {}, LHS.s); hs.pool = mkPool(hs.g); hs.blur = mkBlur();
-const DOOR = archP(150, 230).map((p) => [p[0] + HOUSE.door[0], p[1] + HOUSE.door[1], 0.6]);
-const houseCam = (t) => ({
-  px: 960, py: lerp(540, 700, eo(P(t, 7.0, 1.0), 3)), pz: 0,
-  ry: deg(kf(t, [[6.0, 0], [6.55, -34], [7.0, 26], [7.45, 0]])), rx: -deg(kf(t, [[6.0, 0], [6.55, 16], [7.0, 8], [7.45, 0]])),
-  dolly: t < 7.5 ? 200 * sp(P(t, 6.55, 0.45), 9) + 450 * sp(P(t, 7.0, 0.5), 9) : FOC - FOC / Math.exp(lerp(Math.log(1800 / 1150), Math.log(20), ei(P(t, 7.5, 0.5), 2.2))),
-});
-function house(t) {
-  const dep = 420 * sp(P(t, 6.0, 0.45), 9), wing = 230 * sp(P(t, 6.5, 0.4), 9), cam = makeCam(houseCam(t)), zb = -dep, rb = -dep - 60;
-  const faces = [];
-  faces.push({ pts: [[-9000, 820, 900], [10900, 820, 900], [10900, 820, -14000], [-9000, 820, -14000]], n: [0, -1, 0], col: shade(COL[T.house.ground], -T.house.floor), flat: true, floor: true });
-  if (dep > 0.5) faces.push(...boxFaces(700, 1220, 480, 820, 0, zb, COL[T.house.body], 'u'));
-  else faces.push(...boxFaces(700, 1220, 480, 820, 0, -0.5, COL[T.house.body], 'u').filter((x) => x.id === 'f'));
-  faces.push({ pts: [[640, 480, 0], [1280, 480, 0], [960, 250, 0]], n: [0, 0, 1], col: COL[T.house.roof], flat: true });
-  if (dep > 0.5) {
-    faces.push({ pts: [[640, 480, rb], [1280, 480, rb], [960, 250, rb]], n: [0, 0, -1], col: COL[T.house.roof] });
-    faces.push({ pts: [[640, 480, 0], [960, 250, 0], [960, 250, rb], [640, 480, rb]], n: [-0.584, -0.812, 0], col: COL[T.house.roof] });
-    faces.push({ pts: [[1280, 480, 0], [960, 250, 0], [960, 250, rb], [1280, 480, rb]], n: [0.584, -0.812, 0], col: COL[T.house.roof] });
+const STEP = 60, Z_DOOR = 2 * STEP;                                   // each smaller arch stands 60 px proud of the one behind it
+const archPts = (cx, w, h, n = 24) => {                               // an arch on the floor: straight sides + a half-circle (just the cap while it is still rising out of the floor)
+  const r = w / 2, cyc = FLOOR - h + r, a0 = h >= r ? 0 : Math.asin((r - h) / r), p = [];
+  if (h >= r) p.push([cx - r, FLOOR], [cx + r, FLOOR]);
+  for (let i = 0; i <= n; i++) { const a = a0 + (Math.PI - 2 * a0) * i / n; p.push([cx + r * Math.cos(a), cyc - r * Math.sin(a)]); }
+  return p;
+};
+const discPts = (cx, r, h, n = 44) => {                               // a disc rising out of the floor: the part of the circle above it (h = 0 … 2r)
+  const a0 = Math.asin(clamp((r - h) / r, -1, 1)), cyc = FLOOR - h + r, p = [];
+  for (let i = 0; i <= n; i++) { const a = a0 + (Math.PI - 2 * a0) * i / n; p.push([cx + r * Math.cos(a), cyc - r * Math.sin(a)]); }
+  return p;
+};
+function slabFaces(pts, zf, zb, col, bias = 0) {                       // a convex shape extruded from the front plane zf back to zb (sides only once it has depth)
+  const faces = [{ pts: pts.map((p) => [p[0], p[1], zf]), n: [0, 0, 1], col, flat: true, bias }];
+  if (zf - zb < 0.5) return faces;
+  faces.push({ pts: pts.map((p) => [p[0], p[1], zb]), n: [0, 0, -1], col, bias });
+  const gx = pts.reduce((s, p) => s + p[0], 0) / pts.length, gy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey);
+    if (L < 1e-6) continue;
+    let nx = ey / L, ny = -ex / L; if (nx * ((a[0] + b[0]) / 2 - gx) + ny * ((a[1] + b[1]) / 2 - gy) < 0) { nx = -nx; ny = -ny; }
+    if (ny > 0.99) continue;                                          // the underside rests on the floor
+    faces.push({ pts: [[a[0], a[1], zf], [b[0], b[1], zf], [b[0], b[1], zb], [a[0], a[1], zb]], n: [nx, ny, 0], col, bias });
   }
-  faces.push({ pts: DOOR, n: [0, 0, 1], col: COL[T.house.door], flat: true });
-  if (wing > 0.5) faces.push(...boxFaces(1224, 1544, 820 - wing, 820, -60, -380, COL[T.house.wing], 'u'));
+  return faces;
+}
+const portalCam = (t) => ({
+  px: 960, py: lerp(540, PORTAL.door[1], eo(P(t, 7.0, 1.0), 3)), pz: 0,
+  ry: deg(kf(t, [[6.0, 0], [6.55, -34], [7.0, 26], [7.45, 0]])), rx: -deg(kf(t, [[6.0, 0], [6.55, 16], [7.0, 8], [7.45, 0]])),
+  // the push ends 90 px in front of the black arch, which then fills the frame
+  dolly: t < 7.5 ? 200 * sp(P(t, 6.55, 0.45), 9) + 450 * sp(P(t, 7.0, 0.5), 9) : FOC - FOC / Math.exp(lerp(Math.log(1800 / 1150), Math.log(FOC / (Z_DOOR + 90)), ei(P(t, 7.5, 0.5), 2.2))),
+});
+function portal(t) {
+  const dep = 420 * sp(P(t, 6.0, 0.45), 9), zm = STEP * sp(P(t, 6.05, 0.4), 9), zd = zm + STEP * sp(P(t, 6.12, 0.4), 9), rise = 300 * sp(P(t, 6.5, 0.4), 9), cam = makeCam(portalCam(t));
+  const faces = [];
+  faces.push({ pts: [[-9000, FLOOR, 900], [10900, FLOOR, 900], [10900, FLOOR, -14000], [-9000, FLOOR, -14000]], n: [0, -1, 0], col: shade(COL[T.portal.ground], -T.portal.floor), flat: true, floor: true });
+  // the nested arches are layered by `bias` (each one is drawn over the one behind it, whatever the camera does); the disc stands behind them
+  faces.push(...slabFaces(archPts(960, ...ARCH.outer), 0, -dep, COL[T.portal.outer]));
+  faces.push(...slabFaces(archPts(960, ...ARCH.mid), zm, 0, COL[T.portal.mid], 1000));
+  faces.push(...slabFaces(archPts(960, ...ARCH.door), zd, zm, COL[T.portal.door], 2000));
+  if (rise > 0.5) faces.push(...slabFaces(discPts(1450, 150, rise), -60, -170, COL[T.portal.wing]));
   // the floor is always drawn first, the rest far to near
   const floor = faces.filter((f) => f.floor), rest = faces.filter((f) => !f.floor);
   const items = faceItems(cam, floor).concat(faceItems(cam, rest)); flush(hs.pool, items);
-  const v = vel((tt) => { const c = makeCam(houseCam(tt)); return c.proj([1220, 480, -200]); }, t); setBlur(hs.blur, hs.g, v[0], v[1]);
+  const v = vel((tt) => { const c = makeCam(portalCam(tt)); return c.proj([1200, 520, -200]); }, t); setBlur(hs.blur, hs.g, v[0], v[1]);
 }
 
 /* ===================== 5 · DATA / UI  (8 – 10 s) ===================== */
@@ -478,7 +501,7 @@ const SCENES = [[LH, 0, 2], [LK, 2, 4], [LM, 4, 6], [LHS, 6, 8], [LUI, 8, 10], [
 window.seek = (t) => {
   t = clamp(t, 0, 15);
   SCENES.forEach(([L, a, b]) => show(L, t >= a && t < b));
-  if (t < 2) hook(t); else if (t < 4) kinetic(t); else if (t < 6) morph(t); else if (t < 8) house(t); else if (t < 10) uiScene(t); else if (t < 12) stripes(t); else finale(t);
+  if (t < 2) hook(t); else if (t < 4) kinetic(t); else if (t < 6) morph(t); else if (t < 8) portal(t); else if (t < 10) uiScene(t); else if (t < 12) stripes(t); else finale(t);
   return true;
 };
 window.__ready = document.fonts.load("900 100px Display").then(() => document.fonts.ready).then(() => { window.seek(0); return true; });

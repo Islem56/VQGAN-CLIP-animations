@@ -8,7 +8,7 @@ yet approachable; clean compositions, thoughtful details, refined typography.
 <direction>
 A 15-second motion design showreel that proves you are a world-class motion designer.
 **Concept: "THE DOOR"** — the period of DAR.COM is a circle; it is the door. The dot floods the frame, the flood becomes
-ink, ink becomes type, type becomes shapes, shapes become a house (*dar* = house), the house's door opens onto an
+ink, ink becomes type, type becomes shapes, shapes become a portal of nested arches, the camera pushes through its black door onto an
 interface, the interface stretches into a wall of type, the wall becomes a city of letters, and the city folds back into
 the wordmark. Every shot is made out of the previous one: shapes, type and colour transform into the next scene instead
 of cutting or fading.
@@ -27,8 +27,8 @@ holds longer than half a second, anything that looks like a template.
 |---|---|---|
 | 1 | 0–2 | **Hook.** DAR.COM → the letters leave, the dot turns vermilion and floods the frame → a black ring ripples, an ink dot floods black |
 | 2 | 2–4 | **Kinetic type** (black). BRAND · SHOOT · POST · BUILD, each with its own move (mask rise with a hairline → black weight morph, split, zoom-through, drop); the cobalt **I** of BUILD stretches into the next ground |
-| 3 | 4–6 | **Shape morph** (cobalt). Three discs → square / triangle / arch → cycled → they lock into a house elevation |
-| 4 | 6–8 | **2D → 3D.** The elevation extrudes, the camera orbits, a wing rises, the camera pushes through the black door |
+| 3 | 4–6 | **Shape morph** (cobalt). Three discs → square / triangle / arch → cycled → they lock into a portal of three nested arches |
+| 4 | 6–8 | **2D → 3D.** The arches extrude and step forward, the camera orbits, a disc (the dot) rises beside them, the camera pushes through the black arch |
 | 5 | 8–10 | **Data / UI** (black). The services card, toggles flip on the cursor's clicks, bars grow; the bars stretch into stripes |
 | 6 | 10–12 | **The riser.** Six stripes of vertical type scroll in opposite directions, faster every beat; a vermilion disc pushes through |
 | 7 | 12–14 | **The strongest moment.** DAR.COM stands up as extruded architecture, the camera whips around it |

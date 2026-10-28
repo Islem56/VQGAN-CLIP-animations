@@ -16,7 +16,7 @@ render.cjs                  audio + 60 fps × 3 subframes + ffmpeg tmix + mux:  
 ## Palettes
 
 Four palettes, picked with the URL hash (`darcom-showreel.html#yaqout`) or `--theme` when rendering: **sunshine**, **sunnynight**, **dune**, **yaqout**.
-They are tonal (rust / brown / cream / black), so each scene has a role table (which colour is the ground, the house, the stripes…)
+They are tonal (rust / brown / cream / black), so each scene has a role table (which colour is the ground, the arches, the stripes…)
 chosen for contrast: see `THEMES` in `src/showreel.template.html`.
 
 ```bash
