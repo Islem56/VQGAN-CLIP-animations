@@ -367,7 +367,7 @@ function portal(t) {
   faces.push(...slabFaces(archPts(960, ...ARCH.outer), 0, -dep, COL[T.portal.outer]));
   faces.push(...slabFaces(archPts(960, ...ARCH.mid), zm, 0, COL[T.portal.mid], 1000));
   faces.push(...slabFaces(archPts(960, ...ARCH.door), zd, zm, COL[T.portal.door], 2000));
-  if (rise > 0.5) faces.push(...slabFaces(discPts(1450, 150, rise), -60, -170, COL[T.portal.wing]));
+  if (rise > 0.5) faces.push(...slabFaces(discPts(1450, 150, rise), -60, -60 - 110 * clamp(rise / 60), COL[T.portal.wing]));
   // the floor is always drawn first, the rest far to near
   const floor = faces.filter((f) => f.floor), rest = faces.filter((f) => !f.floor);
   const items = faceItems(cam, floor).concat(faceItems(cam, rest)); flush(hs.pool, items);
