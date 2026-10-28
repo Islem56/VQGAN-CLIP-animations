@@ -38,35 +38,63 @@ const Logo: React.FC<{ p: Preset; x: number; y: number; taille: number; rot?: nu
   );
 
 // Le texte qui se pose mot après mot. n = nombre de « cases de mots » écoulées : un mot met ANIM cases à se poser,
-// donc les mots se chevauchent (effet de vague). Chaque mot monte du bas en sortant du flou, avec un petit rebond ;
-// les mots-clés (gras) s'illuminent à l'arrivée et se soulignent d'un trait qui se trace.
+// donc les mots se chevauchent (effet de vague). Deux styles, choisis par `effet` dans content.ts :
+//  · "impact" : chaque mot monte du bas en sortant du flou, avec un petit rebond ; les mots-clés (gras) s'illuminent
+//    à l'arrivée et se soulignent d'un trait qui se trace.
+//  · "cine"   : chaque mot glisse hors d'un masque, légèrement incliné ; les mots-clés reçoivent un surligneur
+//    translucide qui balaie le mot, puis se réduit à un trait.
 const ANIM = 4; // à garder identique dans scripts/make-sound.py
 const outBack = (t: number) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
 const outCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+const outExpo = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const mots = (blocs: Bloc[]) => blocs.reduce((s, b) => s + b.texte.split(" ").length, 0);
+
+type MotProps = { texte: string; g: boolean; suite: boolean; q: number; accent: string }; // g = mot-clé · suite = le groupe en gras continue · q = avancement 0 → 1
+const MotImpact: React.FC<MotProps> = ({ texte, g, suite, q, accent }) => {
+  const bk = outBack(q);
+  return (
+    <span style={{ display: "inline-block", position: "relative", opacity: clamp01(q * 3), transform: `translateY(${((1 - bk) * 34).toFixed(1)}px) scale(${(g ? 0.8 + 0.2 * bk : 0.92 + 0.08 * bk).toFixed(3)})`, transformOrigin: "50% 85%", filter: q < 1 ? `blur(${(10 * (1 - outCubic(q))).toFixed(1)}px)` : undefined, fontWeight: g ? 600 : undefined, textShadow: g && q < 1 ? `0 0 ${(30 * (1 - q)).toFixed(1)}px rgba(255,255,255,${(0.95 * (1 - q)).toFixed(2)})` : undefined }}>
+      {texte}
+      {g && <span style={{ position: "absolute", left: 0, bottom: -1, height: 3, borderRadius: 2, background: accent, opacity: 0.55, width: `calc((100% + ${suite ? 0.3 : 0}em) * ${outCubic(clamp01((q - 0.3) / 0.7)).toFixed(3)})` }} />}
+    </span>
+  );
+};
+const MotCine: React.FC<MotProps> = ({ texte, g, suite, q, accent }) => {
+  const e = outExpo(clamp01(q / 0.55));                  // le mot glisse hors du masque
+  const sx = outCubic(clamp01((q - 0.1) / 0.35));        // le surligneur balaie le mot…
+  const fondu = 1 - clamp01((q - 0.62) / 0.3);           // …puis s'efface, le trait reste
+  const ext = suite ? "0.3em" : "6px";
+  return (
+    <span style={{ display: "inline-block", position: "relative", verticalAlign: "top", isolation: "isolate" }}>
+      {g && <span style={{ position: "absolute", left: -6, right: `calc(-1 * ${ext})`, top: 6, bottom: 4, borderRadius: 6, background: "rgba(243,242,239,0.2)", transformOrigin: "0 50%", transform: `scaleX(${sx.toFixed(3)})`, opacity: fondu, zIndex: -1 }} />}
+      <span style={{ display: "inline-block", overflow: "hidden", padding: "8px 0", margin: "-8px 0", verticalAlign: "top" }}>
+        <span style={{ display: "inline-block", transform: `translateY(${((1 - e) * 110).toFixed(1)}%) skewY(${((1 - e) * 7).toFixed(2)}deg)`, transformOrigin: "0 100%", fontWeight: g ? 600 : undefined }}>{texte}</span>
+      </span>
+      {g && <span style={{ position: "absolute", left: 0, bottom: -1, height: 3, borderRadius: 2, background: accent, opacity: 0.6, width: `calc((100% + ${suite ? "0.3em" : "0px"}) * ${sx.toFixed(3)})` }} />}
+    </span>
+  );
+};
 const Reponse: React.FC<{ p: Preset; n: number }> = ({ p, n }) => {
   let i = 0, gras = false;
+  const Mot = p.effet === "cine" ? MotCine : MotImpact;
   return (
     <div style={{ width: COL, fontFamily: POLICE_TITRE, fontSize: 35, lineHeight: "52px", color: PAL.texte, display: "flex", flexDirection: "column", gap: 14 }}>
       {p.reponse.map((b, k) => {
         const pb = clamp01((n - i) / ANIM); // avancement du premier mot du bloc : la puce arrive avec lui
+        const pop = p.effet === "cine" ? outExpo(pb) : outBack(pb);
         return (
           <div key={k} style={{ display: "flex", gap: 16, fontWeight: b.type === "h" ? 600 : 400, marginTop: b.type === "h" ? 14 : 0, paddingLeft: b.type === "li" ? 8 : 0 }}>
-            {b.type === "li" && <div style={{ width: 10, height: 10, borderRadius: 5, background: p.accent, marginTop: 22, flexShrink: 0, opacity: clamp01(pb * 3), transform: `scale(${outBack(pb).toFixed(3)})` }} />}
+            {b.type === "li" && <div style={{ width: 10, height: 10, borderRadius: 5, background: p.accent, marginTop: 22, flexShrink: 0, opacity: clamp01(pb * 3), transform: `scale(${pop.toFixed(3)})` }} />}
             <div>
               {b.texte.split(" ").map((m, j) => {
                 const ouvre = m.startsWith("**"), ferme = m.replace(/[.,:;!?]+$/, "").endsWith("**");
                 if (ouvre) gras = true;
                 const g = gras, suite = g && !ferme; if (ferme) gras = false;
                 const q = clamp01((n - i) / ANIM); i++;
-                const bk = outBack(q);
                 return (
                   <React.Fragment key={j}>
-                    <span style={{ display: "inline-block", position: "relative", opacity: clamp01(q * 3), transform: `translateY(${((1 - bk) * 34).toFixed(1)}px) scale(${(g ? 0.8 + 0.2 * bk : 0.92 + 0.08 * bk).toFixed(3)})`, transformOrigin: "50% 85%", filter: q < 1 ? `blur(${(10 * (1 - outCubic(q))).toFixed(1)}px)` : undefined, fontWeight: g ? 600 : undefined, textShadow: g && q < 1 ? `0 0 ${(30 * (1 - q)).toFixed(1)}px rgba(255,255,255,${(0.95 * (1 - q)).toFixed(2)})` : undefined }}>
-                      {m.replace(/\*\*/g, "")}
-                      {g && <span style={{ position: "absolute", left: 0, bottom: -1, height: 3, borderRadius: 2, background: p.accent, opacity: 0.55, width: `calc((100% + ${suite ? 0.3 : 0}em) * ${outCubic(clamp01((q - 0.3) / 0.7)).toFixed(3)})` }} />}
-                    </span>{" "}
+                    <Mot texte={m.replace(/\*\*/g, "")} g={g} suite={suite} q={q} accent={p.accent} />{" "}
                   </React.Fragment>
                 );
               })}

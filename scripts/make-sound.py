@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Synthesizes public/sound.wav, the sound track of the ChatIA video (numpy only, no samples).
 
-"Impact" sound design, made to grab attention in a feed: a sub boom on the first frame, crisp rising keys,
+Two sound styles, chosen by `effet` in src/content.ts (it also picks the word animation in src/Chat.tsx):
+  "impact" – punchy, made to grab attention in a feed: a sub boom on the first frame, crisp rising keys,
 a riser into every key moment, "AI thinking" bleeps, a four-on-the-floor pulse + hats that build during the
 answer, one bright note per word (rising scale), an accent on every bold word, and a big impact + chime at the end.
 
 It follows the film timings of src/Chat.tsx (the T_* constants, ANIM and the speed x1.4) and reads the question and
-the answer (incl. which words are bold) from src/content.ts, so everything stays in sync with the text.
+  "cine"   – cinematic and elegant: a soft swell + bells on the first frame, a heartbeat, a swish per word, a marker
+             sweep on every bold word, and a long impact finished by a double "message sent" ding.
+It reads the question and the answer (incl. which words are bold) from src/content.ts, so everything stays in sync with the text.
 Run from the repo root after changing content.ts or the timings:  python3 scripts/make-sound.py
 """
 import re, wave
@@ -30,6 +33,7 @@ vt = lambda T: (T - T0) / VITESSE  # film time -> video time (s)
 
 src = (ROOT / "src" / "content.ts").read_text(encoding="utf-8")
 question = re.search(r'question:\s*"((?:[^"\\]|\\.)*)"', src).group(1)
+CINE = re.search(r'effet:\s*"(\w+)",', src).group(1) == "cine"  # the value (with a comma), not the type
 bold = []  # one flag per word of the answer, same rule as Reponse in Chat.tsx
 gras = False
 for texte in re.findall(r'texte:\s*"((?:[^"\\]|\\.)*)"', src):
@@ -183,20 +187,26 @@ glow = np.zeros(N)
 for f, a in [(293.66, 1.0), (440.0, 0.7), (739.99, 0.5), (1174.66, 0.3)]:
     glow += a * np.sin(2 * np.pi * f * t + 0.8 * np.sin(2 * np.pi * 5.5 * t))
 glow = band(glow, 250, 3000) / np.abs(glow).max() * np.clip((t - 5.0) / 4.2, 0, 1) ** 1.5
-pump = 1 - 0.6 * np.exp(-np.mod(t, 0.5) / 0.13)
+pump = 1 - (0.3 if CINE else 0.6) * np.exp(-np.mod(t, 1.0 if CINE else 0.5) / (0.25 if CINE else 0.13))
 env = np.minimum(1, t / 0.8) * np.minimum(1, (DUREE - t) / 1.2)
 L += (pad * 0.07 + glow * 0.035) * pump * env
 R += (pad * 0.07 + glow * 0.035) * pump * env
 
 # ─── 0. The hook: a deep impact on the very first frame ───
-put(boom(1.5), 0.0, 0.85)
-put(crack(0.18), 0.0, 0.30)
-put(sweep(0.7, 7000, 300, 0.08), 0.0, 0.20)
+if CINE:
+    put(boom(1.5), 0.0, 0.55)
+    put(sweep(0.9, 6000, 250, 0.1), 0.0, 0.16)
+    put(bell(1174.66, 2.6, 0.8), 0.03, 0.10, -0.2)
+    put(bell(880.0, 2.6, 0.8), 0.10, 0.08, 0.2)
+else:
+    put(boom(1.5), 0.0, 0.85)
+    put(crack(0.18), 0.0, 0.30)
+    put(sweep(0.7, 7000, 300, 0.08), 0.0, 0.20)
 
 # ─── 1. The question is typed: crisp keys that climb in pitch, then a riser into the click ───
 for c, ch in enumerate(question, start=1):
     T = T_FRAPPE + (c - 0.5) / len(question) * (T_FRAPPE_FIN - T_FRAPPE)
-    put(key(space=(ch == " "), soft=rng.uniform(0.8, 1.0), pitch=1 + 0.45 * c / len(question)), vt(T), 0.42, rng.uniform(-0.2, 0.2))
+    put(key(space=(ch == " "), soft=rng.uniform(0.8, 1.0), pitch=1 + (0 if CINE else 0.45) * c / len(question)), vt(T), 0.34 if CINE else 0.42, rng.uniform(-0.2, 0.2))
 put(slide(700, 1100, 0.1), vt(T_FRAPPE + 0.12), 0.10, 0.3)
 put(riser(0.5, 300, 8000), vt(T_CLIC) - 0.5, 0.15)
 
@@ -248,36 +258,57 @@ put(thump(150, 48, 0.4), t_rep, 0.50)
 put(crack(0.14), t_rep, 0.14)
 for f, g in [(587.33, 0.13), (880.0, 0.10), (1174.66, 0.09)]:
     put(bell(f, 1.8), t_rep + 0.02, g)
-th = t_env + 0.3
-while th < T_DERNIER:
-    off = round((th - t_env) / 0.25) % 2 == 1
-    put(hat(open_=off and rng.random() < 0.25), th, (0.06 if off else 0.035) * (1.5 if th > t_rep else 1.0), 0.3 if off else -0.3)
-    th += 0.25
-tk = t_rep + 0.5
-while tk < T_DERNIER - 0.25:
-    put(thump(125, 46, 0.3), tk, 0.34)
-    tk += 0.5
+if CINE:  # a heartbeat ("dub-dub") every second, no drums
+    tk = t_rep + 0.3
+    while tk < T_DERNIER - 0.3:
+        put(thump(100, 42, 0.36), tk, 0.30)
+        put(thump(100, 42, 0.30), tk + 0.22, 0.20)
+        tk += 1.0
+else:
+    th = t_env + 0.3
+    while th < T_DERNIER:
+        off = round((th - t_env) / 0.25) % 2 == 1
+        put(hat(open_=off and rng.random() < 0.25), th, (0.06 if off else 0.035) * (1.5 if th > t_rep else 1.0), 0.3 if off else -0.3)
+        th += 0.25
+    tk = t_rep + 0.5
+    while tk < T_DERNIER - 0.25:
+        put(thump(125, 46, 0.3), tk, 0.34)
+        tk += 0.5
 
-# ─── 6. The answer, word by word: a bright note per word climbing the scale, an accent on every bold word ───
+# ─── 6. The answer, word by word ───
 for i in range(W):
     idx = int(np.clip(round(i / max(1, W - 1) * (len(PENTA) - 1)) + rng.choice([-1, 0, 0, 1]), 0, len(PENTA) - 1))
-    f, tw, pan = PENTA[idx], t_mot(i), (-0.4 if i % 2 else 0.4)
-    put(pluck(f), tw, 0.085, pan)
-    put(key(soft=0.35, pitch=1.6), tw, 0.12, pan)
-    if bold[i]:
-        put(bell(f * 2, 1.0, 1.2), tw, 0.10, -pan)
-        put(bell(PENTA[-1] * 1.5, 0.5, 1.5), tw + 0.02, 0.035, pan)
-        put(thump(150, 70, 0.22), tw, 0.22)
+    f, pan = PENTA[idx], (-0.4 if i % 2 else 0.4)
+    if CINE:  # a swish as each word slides out of its mask; bold words: a marker sweep, then a soft knock and a bell
+        put(sweep(0.14, 1200, 7500, 0.5), t_mot(i, 0.0), 0.07, pan)
+        put(key(soft=0.25, pitch=1.4), t_mot(i, 0.5), 0.08, pan)
+        if bold[i]:
+            put(sweep(0.32, 500, 6500, 0.35), t_mot(i, 0.1) - 0.04, 0.13, -pan)
+            put(thump(230, 110, 0.14), t_mot(i, 0.6), 0.20)
+            put(bell(f * 2, 1.1, 1.2), t_mot(i, 0.6), 0.09, -pan)
+    else:  # a bright note per word climbing the scale, an accent on every bold word
+        tw = t_mot(i)
+        put(pluck(f), tw, 0.085, pan)
+        put(key(soft=0.35, pitch=1.6), tw, 0.12, pan)
+        if bold[i]:
+            put(bell(f * 2, 1.0, 1.2), tw, 0.10, -pan)
+            put(bell(PENTA[-1] * 1.5, 0.5, 1.5), tw + 0.02, 0.035, pan)
+            put(thump(150, 70, 0.22), tw, 0.22)
 
-# ─── 7. The finale: a riser, a big impact, a chord and a falling shimmer ───
-put(riser(0.4, 400, 10000), T_DERNIER - 0.4, 0.17)
-put(boom(1.6), T_DERNIER, 0.90)
-put(crack(0.2), T_DERNIER, 0.35)
+# ─── 7. The finale: a riser, a big impact and a chord; "cine" ends on a "message sent" swoosh and a double ding ───
+put(riser(0.5 if CINE else 0.4, 400, 10000), T_DERNIER - (0.5 if CINE else 0.4), 0.17)
+put(boom(1.6), T_DERNIER, 0.75 if CINE else 0.90)
+put(crack(0.2), T_DERNIER, 0.25 if CINE else 0.35)
 put(sweep(0.7, 8000, 300, 0.08), T_DERNIER, 0.22)
 for f, dt, g in [(587.33, 0.0, 0.14), (880.0, 0.03, 0.12), (1174.66, 0.06, 0.11), (1479.98, 0.09, 0.09), (1760.0, 0.12, 0.08)]:
     put(bell(f, 2.2), T_DERNIER + dt, g, rng.uniform(-0.3, 0.3))
-for j, f in enumerate([3520.0, 2959.96, 2349.3, 1975.5, 1760.0, 1479.98]):
-    put(bell(f, 0.9, 1.4), T_DERNIER + 0.15 + 0.06 * j, 0.045, 0.5 - 0.2 * j)
+if CINE:
+    put(sweep(0.3, 500, 7000, 0.5), T_DERNIER + 0.16, 0.14, 0.2)
+    put(bell(1318.5, 1.6, 1.3), T_DERNIER + 0.36, 0.17, -0.1)
+    put(bell(1760.0, 1.6, 1.3), T_DERNIER + 0.48, 0.17, 0.1)
+else:
+    for j, f in enumerate([3520.0, 2959.96, 2349.3, 1975.5, 1760.0, 1479.98]):
+        put(bell(f, 0.9, 1.4), T_DERNIER + 0.15 + 0.06 * j, 0.045, 0.5 - 0.2 * j)
 
 # ─── Space: a reverb on everything, then master (soft saturation for punch, peak 0.9, fade-out) ───
 def impulse():
@@ -303,4 +334,4 @@ out.parent.mkdir(exist_ok=True)
 pcm = (np.stack([L, R], axis=1) * 32767).astype("<i2")
 with wave.open(str(out), "wb") as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes(pcm.tobytes())
-print(f"{out.relative_to(ROOT)}: {DUREE:.2f}s, {len(question)} keys, {W} words ({sum(bold)} bold), finale at {T_DERNIER:.2f}s")
+print(f"{out.relative_to(ROOT)} [{'cine' if CINE else 'impact'}]: {DUREE:.2f}s, {len(question)} keys, {W} words ({sum(bold)} bold), finale at {T_DERNIER:.2f}s")
