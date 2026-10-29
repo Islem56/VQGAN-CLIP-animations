@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AURA LUNA — Éclipse</title>
+<meta name="viewport" content="width=1920, height=1080">
+<style>
+@font-face{font-family:"Montserrat";src:url(data:font/woff2;base64,__FONT_B64__) format("woff2");font-weight:100 900;font-display:block}
+html,body{margin:0;background:#02060E;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#02060E;font-family:"Montserrat",sans-serif;-webkit-font-smoothing:antialiased}
+#stage>svg{position:absolute;left:0;top:0}
+.screen{mix-blend-mode:screen}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="defs" width="0" height="0" style="position:absolute"></svg>
+<script>
+/* AURA LUNA — "ÉCLIPSE" · 13.5 s · 80 BPM · 1920x1080 · one continuous shot
+   Darkness. In extreme close-up, out of focus, two fingertips and a pulse of violet light: the spark ignites. The camera
+   pulls back to the whole key visual; « L'instant où une idée devient image » types itself. A Cosmos moon glides along
+   the light and eclipses the spark: corona, totality, the diamond ring; the camera dives into the eclipse. A ring of light
+   breaks out and the moon opens into the monogram, backlit; the light sweeps it from shadow to violet to white, then
+   reveals the wordmark, the descriptor and the signature.
+   Everything on screen is a pure function of time: window.seek(t). No CSS animations, no timers, no state between frames.
+   Brand: the Aura Luna palette, its light effects (Halo 70 % → 0 %, Éclipse: Cosmos disc, Halo ring, diffuse halo, the
+   main gradient Cosmos → Nuit → Luna → Halo), Montserrat, the Asik wordmark traced from the official lock-up. */
+(() => {
+'use strict';
+const MONO = __MONO__, WM = __WORDMARK__, HANDS = { human: '__HAND_HUMAN__', robot: '__HAND_ROBOT__' };
+const W = 1920, H = 1080, BEAT = 0.75, DUR = 13.5;
+window.DUR = DUR;
+
+/* ───────────── maths · easing ───────────── */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const f1 = (n) => Math.round(n * 10) / 10, f2 = (n) => Math.round(n * 100) / 100, f3 = (n) => Math.round(n * 1000) / 1000;
+const P = (t, t0, d) => clamp((t - t0) / d);
+const eo = (p, k = 6) => (1 - Math.exp(-k * p)) / (1 - Math.exp(-k));
+const ei = (p, k = 5) => (Math.exp(k * p) - 1) / (Math.exp(k) - 1);
+const sp = (p, w = 11) => { const f = (x) => 1 - (1 + w * x) * Math.exp(-w * x); return f(p) / f(1); };   // critically damped spring
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const deg = (d) => d * Math.PI / 180;
+const C = {
+  COSMOS: '#02060E', NUIT: '#1F0533', ORBITE: '#3C0557', AURA: '#59047C', LUNA: '#7604A0', HALO: '#9303C5',
+  BLANC: '#FFFFFF', LUNAIRE: '#F4F1F7', BRUME: '#E2D3EC', ARDOISE: '#6E6A75', ECLIPSE: '#D53207',
+};
+
+/* ───────────── dom helpers ───────────── */
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const stage = document.getElementById('stage'), defs = document.getElementById('defs');
+const svg = S('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, stage);
+const vis = (el, on) => { const v = on ? '' : 'none'; if (el.style.display !== v) el.style.display = v; };
+const type = (w, size, ls = 0) => `font-family:Montserrat,sans-serif;font-weight:${w};font-variation-settings:'wght' ${w};font-size:${size}px;letter-spacing:${ls}px`;
+const tf = (el, s) => el.setAttribute('transform', s);
+const around = (c, k) => `translate(${f1(c[0])} ${f1(c[1])}) scale(${k.toFixed(4)}) translate(${f1(-c[0])} ${f1(-c[1])})`;
+let gid = 0;
+const radial = (stops) => { const id = 'g' + gid++; const g = S('radialGradient', { id, cx: '50%', cy: '50%', r: '50%' }, defs); stops.forEach(([o, c, a]) => S('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, g)); return `url(#${id})`; };
+const linear = (stops) => { const id = 'g' + gid++; const g = S('linearGradient', { id, x1: '0%', y1: '0%', x2: '100%', y2: '0%' }, defs); stops.forEach(([o, c, a]) => S('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, g)); return `url(#${id})`; };
+const HALO_FILL = radial([['0%', C.HALO, 0.7], ['100%', C.HALO, 0]]);                                   // « Halo 70 % → 0 % »
+const CORE_FILL = radial([['0%', C.BLANC, 1], ['16%', C.BRUME, 0.95], ['42%', C.HALO, 0.6], ['100%', C.HALO, 0]]);
+const STREAK_FILL = linear([['0%', C.HALO, 0], ['42%', C.BRUME, 0.5], ['50%', C.BLANC, 1], ['58%', C.BRUME, 0.5], ['100%', C.HALO, 0]]);
+const CORONA_FILL = radial([['0%', C.BLANC, 0], ['34%', C.BLANC, 0], ['37%', C.BRUME, 0.9], ['44%', C.HALO, 0.75], ['70%', C.LUNA, 0.25], ['100%', C.HALO, 0]]);   // a ring of light around the moon
+
+/* motion blur that follows speed and direction */
+const BLUR_K = 0.0042, BLUR_MAX = 46, blurs = [];
+const mkBlur = (r = 30) => { const f = S('filter', { id: 'mb' + blurs.length, x: `-${r}%`, y: `-${r}%`, width: `${100 + 2 * r}%`, height: `${100 + 2 * r}%`, 'color-interpolation-filters': 'sRGB' }, defs); blurs.push(S('feGaussianBlur', { stdDeviation: '0 0' }, f)); return blurs.length - 1; };
+const setBlur = (i, el, vx, vy) => {
+  const sx = Math.min(BLUR_MAX, Math.abs(vx) * BLUR_K), sy = Math.min(BLUR_MAX, Math.abs(vy) * BLUR_K);
+  if (sx + sy < 0.4) { if (el.style.filter) el.style.filter = ''; return; }
+  blurs[i].setAttribute('stdDeviation', `${f2(sx)} ${f2(sy)}`); el.style.filter = `url(#mb${i})`;
+};
+const vel = (fn, t) => { const d = 1 / 75, a = fn(t - d), b = fn(t); return [(b[0] - a[0]) / d, (b[1] - a[1]) / d]; };
+
+/* ───────────── the mark (traced) and the lock-up (measured on the logo file) ───────────── */
+const pairs = (fl) => { const o = []; for (let i = 0; i < fl.length; i += 2) o.push([fl[i], fl[i + 1]]); return o; };
+const ptsD = (pts, map) => 'M' + pts.map((p) => { const q = map(p); return f1(q[0]) + ' ' + f1(q[1]); }).join('L') + 'Z';
+const rotAbout = (p, c, a) => { const ca = Math.cos(a), sa = Math.sin(a), x = p[0] - c[0], y = p[1] - c[1]; return [c[0] + x * ca - y * sa, c[1] + x * sa + y * ca]; };
+const LKS = 0.92, LKC = [550, 550], LK = (p) => [W / 2 + (p[0] - LKC[0]) * LKS, H / 2 + (p[1] - LKC[1]) * LKS];
+const MOD = {}; for (const k in MONO.modules) MOD[k] = { pts: pairs(MONO.modules[k].loop), c: MONO.modules[k].c };
+const MK = ['At', 'Ab', 'S', 'B', 'C', 'D'];
+const MS = (582 / MONO.w) * LKS, MO = LK([259, 276]);                     // monogram units → screen, in the lock-up
+const UNION_D = MONO.union.map((l) => ptsD(pairs(l), (p) => [MO[0] + p[0] * MS, MO[1] + p[1] * MS])).join('');
+const MARK_C = LK([550, 412]);
+const WB = LK([0, 679])[1], WX0 = LK([167, 0])[0], WX1 = LK([933, 0])[0];
+const DESC = { y: LK([0, 738])[1], x0: LK([170, 0])[0], w: 760 * LKS, size: 34 * LKS };
+const SIG = [{ y: LK([0, 793])[1], x0: LK([254, 0])[0], w: 592 * LKS }, { y: LK([0, 824])[1], x0: LK([293, 0])[0], w: 524 * LKS }], SIG_SIZE = 28 * LKS;
+/* the moon hidden in the mark: the half disc's circle; ideal versions of the three modules that close it */
+const R0 = 151.6, MC = [303.5, 150];
+const arcPts = (cx, cy, r, a0, a1, n) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; });
+const IDEAL = { S: arcPts(MC[0], MC[1], R0, Math.PI, 2 * Math.PI, 96), B: [[300, 150], ...arcPts(300, 150, R0, Math.PI / 2, Math.PI, 48)], C: [[455, 150], ...arcPts(455, 150, R0, Math.PI / 2, Math.PI, 48)] };
+const NRAY = 1440, RAYS = Array.from({ length: NRAY }, (_, i) => i / NRAY * 2 * Math.PI);
+const rayHit = (poly, o, a) => { const dx = Math.cos(a), dy = Math.sin(a); let best = Infinity; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], px = p[0] - o[0], py = p[1] - o[1], ex = q[0] - p[0], ey = q[1] - p[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue; const tt = (px * ey - py * ex) / den, uu = (px * dy - py * dx) / den; if (tt > 1e-6 && uu >= -1e-9 && uu <= 1 + 1e-9 && tt < best) best = tt; } return best; };
+const RAD = {}; for (const k of ['S', 'B', 'C']) RAD[k] = { a: RAYS.map((a) => rayHit(MOD[k].pts, MOD[k].c, a)), b: RAYS.map((a) => rayHit(IDEAL[k], MOD[k].c, a)) };
+const modulePts = (k, m) => (m <= 0 || !RAD[k] ? MOD[k].pts : RAYS.map((a, i) => { const r = lerp(RAD[k].a[i], RAD[k].b[i], m); return [MOD[k].c[0] + r * Math.cos(a), MOD[k].c[1] + r * Math.sin(a)]; }));
+const MOON_MOVE = { S: () => [0, 0, 0, MC], B: (q) => [3.5 * q, 0, 0, [300, 150]], C: (q) => [-151.5 * q, 0, -Math.PI / 2 * q, [455, 150]] };
+
+/* ───────────── the scene graph ───────────── */
+const SPARK = [W / 2, H / 2], TIP_SRC = [960.5, 708];
+S('rect', { width: W, height: H, fill: C.COSMOS }, svg);
+const stars = S('g', {}, svg);
+let seed = 11; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+for (let i = 0; i < 190; i++) { const x = rnd() * W * 1.4 - W * 0.2, y = rnd() * H * 1.4 - H * 0.2, r = 0.5 + rnd() * rnd() * 1.7; S('circle', { cx: f1(x), cy: f1(y), r: f2(r), fill: rnd() < 0.3 ? C.BRUME : C.BLANC, opacity: f2(0.2 + rnd() * 0.6) }, stars); }
+/* the world: the key visual, filmed by one camera */
+const world = S('g', {}, svg);
+const wHalo = S('circle', { cx: SPARK[0], cy: SPARK[1], fill: HALO_FILL }, world);
+// the hands: cut out of the key visual, composited with screen; one filter each = depth of field + motion blur + light
+const handFx = (id) => { const f = S('filter', { id, x: '-20%', y: '-40%', width: '140%', height: '180%', 'color-interpolation-filters': 'sRGB' }, defs); const b = S('feGaussianBlur', { stdDeviation: '0 0' }, f); const ct = S('feComponentTransfer', {}, f); const fn = ['R', 'G', 'B'].map((c) => S('feFunc' + c, { type: 'linear', slope: 1 }, ct)); return { b, fn }; };
+const fxH = handFx('fxH'), fxR = handFx('fxR');
+const handG = (key, box, fxId) => { const g = S('g', { class: 'screen', filter: `url(#${fxId})` }, world); S('image', { href: 'data:image/jpeg;base64,' + HANDS[key], x: box[0] - TIP_SRC[0] + SPARK[0], y: box[1] - TIP_SRC[1] + SPARK[1], width: box[2], height: box[3] }, g); return g; };
+const human = handG('human', [0, 432, 804, 460], 'fxH'), robot = handG('robot', [1128, 456, 792, 460], 'fxR');
+const streak = S('ellipse', { cx: SPARK[0], cy: SPARK[1], fill: STREAK_FILL }, world);
+const core = S('circle', { cx: SPARK[0], cy: SPARK[1], fill: CORE_FILL }, world);
+const dot = S('circle', { cx: SPARK[0], cy: SPARK[1], fill: C.BLANC }, world);
+// the eclipse: a Cosmos moon, its corona, the diamond ring
+const corona = S('circle', { cy: SPARK[1], fill: CORONA_FILL }, world);
+const moonW = S('circle', { cy: SPARK[1], fill: C.COSMOS }, world);
+const rim = S('circle', { cy: SPARK[1], fill: 'none', stroke: C.HALO, 'stroke-width': 0.6 }, world);
+const dHalo = S('circle', { fill: CORE_FILL }, world), dStreak = S('ellipse', { fill: STREAK_FILL }, world);
+world.appendChild(human); world.appendChild(robot);                       // the hands in front: the moon passes behind the fingers
+/* the concept line */
+const CONCEPT = "L'INSTANT OÙ UNE IDÉE DEVIENT IMAGE", CY = 940;
+const cClip = S('clipPath', { id: 'cLine' }, svg); const cRect = S('rect', { y: CY - 34, height: 46 }, cClip);
+const line = S('text', { x: 0, y: CY, fill: C.BRUME, style: type(400, 25, 10.5), 'clip-path': 'url(#cLine)' }, svg);
+const lineDot = S('text', { x: 0, y: CY, fill: C.ECLIPSE, style: type(700, 25, 0), 'clip-path': 'url(#cLine)' }, svg); lineDot.textContent = '.';
+let lineW = 0, lineX = 0;
+/* the reveal (screen space) */
+const reveal = S('g', {}, svg);
+const halo = S('circle', { cx: f1(MARK_C[0]), cy: f1(MARK_C[1]), fill: HALO_FILL }, reveal);
+const wave = S('circle', { cx: SPARK[0], cy: SPARK[1], fill: 'none', stroke: C.BRUME, opacity: 0.85 }, reveal);
+// the corona set free: the same profile as the corona at the cut, but its band keeps its thickness in pixels as it grows
+const WAVE_PROFILE = [[-8, C.BLANC, 0], [0, C.BRUME, 0.9], [28, C.HALO, 0.75], [150, C.LUNA, 0.25], [260, C.HALO, 0]];
+const waveGrad = S('radialGradient', { id: 'waveG', cx: '50%', cy: '50%', r: '50%' }, defs), waveStops = WAVE_PROFILE.map(([, c, a]) => S('stop', { offset: 0, 'stop-color': c, 'stop-opacity': a }, waveGrad));
+const waveGlow = S('circle', { cx: SPARK[0], cy: SPARK[1], fill: 'url(#waveG)' }, reveal);
+reveal.insertBefore(waveGlow, wave);
+// each module is lit by its own gradient (top-left → bottom-right; the right leaf the other way, as on the logo)
+const modGrad = MK.map((k) => {
+  const id = 'mg' + k, rev = k === 'D', g = S('linearGradient', { id, x1: rev ? 1 : 0, y1: rev ? 1 : 0, x2: rev ? 0 : 1, y2: rev ? 0 : 1 }, defs);
+  const stops = [C.BLANC, C.HALO, C.LUNA, C.NUIT, C.COSMOS].map((c) => S('stop', { offset: 0, 'stop-color': c }, g));
+  return { id, stops };
+});
+const mods = MK.map((k, i) => S('path', { fill: `url(#mg${k})`, stroke: `url(#mg${k})`, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }, reveal));
+const mblur = MK.map(() => mkBlur());
+const union = S('path', { d: UNION_D, fill: C.BLANC }, reveal);
+// the wordmark, revealed by a band of light travelling left to right
+const wMask = S('mask', { id: 'wMask', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, svg);
+const wSweep = S('linearGradient', { id: 'wSweep', gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: 0, y2: 0 }, defs);
+S('stop', { offset: 0, 'stop-color': '#fff' }, wSweep); S('stop', { offset: 1, 'stop-color': '#000' }, wSweep);
+S('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#wSweep)' }, wMask);
+const wordG = S('g', { mask: 'url(#wMask)' }, reveal);
+WM.letters.forEach((L) => S('path', { d: L.loops.map((l) => ptsD(pairs(l), LK)).join(''), fill: C.BLANC }, wordG));
+const dClip = S('clipPath', { id: 'cDesc' }, svg); S('rect', { x: 0, y: DESC.y - 40, width: W, height: 48 }, dClip);
+const descG = S('g', { 'clip-path': 'url(#cDesc)' }, reveal);
+const desc = S('text', { x: f1(DESC.x0), y: f1(DESC.y), textLength: f1(DESC.w), lengthAdjust: 'spacing', fill: C.BRUME, style: type(500, DESC.size) }, descG);
+['DIGITAL ', '. ', 'DESIGN ', '. ', 'PRODUCTION'].forEach((s, i) => { const t = S('tspan', { fill: i % 2 ? C.ECLIPSE : C.BRUME }, desc); t.textContent = s; });
+const sClip = S('clipPath', { id: 'cSig' }, svg); const sRect = S('rect', { y: SIG[0].y - 30, height: 70 }, sClip);
+const sig = ['WHERE HUMAN IMAGINATION', 'MEETS DIGITAL CREATION'].map((s, i) => { const e = S('text', { x: f1(SIG[i].x0), y: f1(SIG[i].y), textLength: f1(SIG[i].w), lengthAdjust: 'spacing', fill: C.ARDOISE, style: type(600, SIG_SIZE), 'clip-path': 'url(#cSig)' }, reveal); e.textContent = s; return e; });
+
+/* ───────────── the camera, the light, the timeline ─────────────
+   beats (0.75 s): 0 · 0.75 · 1.5 heartbeats in the dark | 2.25 the spark | 3.0 → 5.4 the pull-back | 4.5 the line
+   6.0 the moon | 7.5 totality | 8.25 the diamond ring | 9.0 the ring of light, the mark | 9.75 violet | 10.5 white, the
+   wordmark | 11.25 the descriptor | 12.0 the signature | → 13.5 */
+const zoom = (t) => {
+  if (t < 3.0) return lerp(3.2, 3.0, P(t, 0, 3.0));
+  if (t < 6.0) return Math.exp(lerp(Math.log(3.0), 0, sp(P(t, 3.0, 2.4), 5)));
+  if (t < 7.5) return lerp(1, 1.8, eo(P(t, 6.0, 1.5), 3));
+  return Math.exp(lerp(Math.log(1.8), Math.log(5.8), smooth(0, 1, P(t, 7.5, 1.5))));
+};
+const MOON_R = 26;                                                        // in world units: 26 × 5.8 ≈ 151 px when the camera arrives
+const moonX = (t) => SPARK[0] + 640 * (1 - sp(P(t, 6.0, 1.5), 6));
+const handIn = (t, t0) => 250 * (1 - sp(P(t, t0, 1.9), 6));
+const beatPulse = (t, b) => Math.exp(-Math.max(0, t - b) * 7) * (t >= b ? 1 : 0);
+const sparkK = (t) => {
+  let k = 0.18 + 0.22 * (beatPulse(t, 0) + beatPulse(t, 0.75) + beatPulse(t, 1.5));       // heartbeats before the spark
+  if (t >= 2.25) k = 1 + 1.6 * Math.exp(-(t - 2.25) * 5) + 0.12 * Math.sin((t - 2.25) * 2.2);  // ignition, then it breathes
+  return k;
+};
+const occ = (t) => 1 - smooth(0, MOON_R + 22, Math.abs(moonX(t) - SPARK[0]));   // how much of the spark the moon hides
+function seekWorld(t) {
+  const z = zoom(t), worldOn = t < 9.0; vis(world, worldOn);
+  tf(stars, around(SPARK, 1 + (z - 1) * 0.12));
+  if (!worldOn) return;
+  tf(world, around(SPARK, z));
+  const k = sparkK(t), o = occ(t), light = 1 - 0.86 * o;
+  // the hands: in from the sides during the macro, depth of field until the pull-back, dimmed by the eclipse
+  const hx = (tt) => -handIn(tt, 0.5), rx = (tt) => handIn(tt, 0.7);
+  tf(human, `translate(${f1(hx(t))} 0)`); tf(robot, `translate(${f1(rx(t))} 0)`);
+  const dof = 7 * clamp((z - 1) / 2.2), vH = Math.abs(vel((tt) => [hx(tt) * zoom(tt), 0], t)[0]) * BLUR_K, vR = Math.abs(vel((tt) => [rx(tt) * zoom(tt), 0], t)[0]) * BLUR_K;
+  fxH.b.setAttribute('stdDeviation', `${f2(Math.min(30, dof + vH) / z)} ${f2(dof / z)}`); fxR.b.setAttribute('stdDeviation', `${f2(Math.min(30, dof + vR) / z)} ${f2(dof / z)}`);
+  const lit = clamp(0.35 + 0.65 * Math.min(1, k)) * lerp(1, 0.28, o); [...fxH.fn, ...fxR.fn].forEach((f) => f.setAttribute('slope', f3(lit)));
+  // the spark
+  core.setAttribute('r', f1(26 * k * light)); dot.setAttribute('r', f2((1.2 + 0.9 * Math.min(1, k)) * (1 - o)));
+  streak.setAttribute('rx', f1((t < 2.25 ? 30 * k : 30 + 330 * eo(P(t, 2.25, 0.6), 4)) * light)); streak.setAttribute('ry', f2(0.9 + 0.25 * k));
+  wHalo.setAttribute('r', f1(130 * k * light + 40));
+  // the eclipse
+  const mOn = t >= 6.0; [moonW, rim, corona].forEach((e) => vis(e, mOn));
+  if (mOn) {
+    const mx = moonX(t); [moonW, rim, corona].forEach((e) => e.setAttribute('cx', f1(mx)));
+    moonW.setAttribute('r', MOON_R); rim.setAttribute('r', MOON_R + 0.3);
+    corona.setAttribute('r', f1((MOON_R / 0.355) * (0.6 + 0.4 * o) * (1 + 0.04 * Math.sin(t * 3))));
+  }
+  const dq = P(t, 8.25, 0.65), dOn = dq > 0 && dq < 1; vis(dHalo, dOn); vis(dStreak, dOn);
+  if (dOn) {
+    const a = deg(-138), p = [SPARK[0] + Math.cos(a) * (MOON_R + 0.5), SPARK[1] + Math.sin(a) * (MOON_R + 0.5)], fl = Math.exp(-dq * 4) * sp(clamp(dq * 12), 9);
+    dHalo.setAttribute('cx', f1(p[0])); dHalo.setAttribute('cy', f1(p[1])); dHalo.setAttribute('r', f2(24 * fl + 0.5));
+    dStreak.setAttribute('cx', f1(p[0])); dStreak.setAttribute('cy', f1(p[1])); dStreak.setAttribute('rx', f2(110 * fl + 0.5)); dStreak.setAttribute('ry', f2(0.55 * fl + 0.05));
+  }
+}
+function seekLine(t) {
+  const on = t >= 4.5 && t < 6.5; vis(line, on); vis(lineDot, on); if (!on) return;
+  if (!lineW) { line.textContent = CONCEPT; lineW = line.getComputedTextLength(); lineX = W / 2 - (lineW + 12) / 2; line.setAttribute('x', f1(lineX)); }
+  const n = Math.min(CONCEPT.length, Math.floor((t - 4.5) / 0.022)); line.textContent = CONCEPT.slice(0, Math.max(0, n));
+  vis(lineDot, n >= CONCEPT.length && t >= 5.35); lineDot.setAttribute('x', f1(lineX + lineW - 8));
+  const close = eo(P(t, 6.05, 0.4), 4), half = (lineW / 2 + 40) * (1 - close); cRect.setAttribute('x', f1(W / 2 - half)); cRect.setAttribute('width', f1(2 * half));
+}
+// the moon (screen space, from 9.0) opens into the mark
+const LEAF_IN = { At: [-760, -320, -90, 9.2], Ab: [-820, 360, 90, 9.28], D: [880, 120, 90, 9.24] };
+const openQ = (t) => 1 - sp(P(t, 9.06, 0.62), 8);                          // 1 = closed moon … 0 = the mark
+const moonPlace = (t) => {                                                 // monogram units → screen: centred moon → the mark's place
+  const k = sp(P(t, 9.06, 0.75), 7), s = lerp((MOON_R * 5.8) / R0, MS, k);
+  const end = [MO[0] + MC[0] * MS, MO[1] + MC[1] * MS], cx = lerp(SPARK[0], end[0], k), cy = lerp(SPARK[1], end[1], k);
+  return { s, ox: cx - MC[0] * s, oy: cy - MC[1] * s };
+};
+function seekReveal(t) {
+  const on = t >= 9.0; vis(reveal, on); if (!on) return;
+  // the ring of light
+  // the corona leaves the moon and travels out of the frame (same gradient, same size at the cut: no jump)
+  const wq = P(t, 9.0, 0.85), rIn = 0.37 * (MOON_R / 0.355) * (1 + 0.04 * Math.sin(9.0 * 3)) * zoom(9.0) * Math.exp(Math.log(8.5) * ei(wq, 2.2)), R = rIn + 260; vis(wave, wq < 1); vis(waveGlow, wq < 1);
+  if (wq < 1) { waveGlow.setAttribute('r', f1(R)); WAVE_PROFILE.forEach(([d], i) => waveStops[i].setAttribute('offset', f3(clamp((rIn + d) / R)))); wave.setAttribute('r', f1(rIn - 1)); wave.setAttribute('stroke-width', f2(1.6)); }
+  // the light behind the mark: centred on the moon while it opens, then on the mark
+  const hk = sp(P(t, 9.06, 0.75), 7); halo.setAttribute('cx', f1(lerp(SPARK[0], MARK_C[0], hk))); halo.setAttribute('cy', f1(lerp(SPARK[1], MARK_C[1], hk)));
+  halo.setAttribute('r', f1(lerp(430, 760, sp(P(t, 9.0, 1.6), 5)) * (1 + 0.025 * Math.sin((t - 9) * 2.4))));
+  // the light on the mark: shadow → violet (9.75) → white (10.5)
+  const v = lerp(-0.2, 1.45, smooth(0, 1, P(t, 9.75, 0.7))), w = lerp(-0.45, 1.25, smooth(0, 1, P(t, 10.5, 0.6)));
+  modGrad.forEach((g) => [w - 0.2, w, Math.min(v - 0.22, 2), v, v + 0.14].forEach((o, i) => g.stops[i].setAttribute('offset', f3(clamp(Math.max(o, i ? 0 : -1))))));
+  const done = t >= 11.2; vis(union, done);
+  MK.forEach((k, i) => {
+    const el = mods[i]; vis(el, !done); if (done) return;
+    let map;
+    if (MOON_MOVE[k]) map = (tt) => { const g = moonPlace(tt), q = openQ(tt), [dx, dy, rot, piv] = MOON_MOVE[k](q); return (p) => { const r = rotAbout(p, piv, rot); return [g.ox + (r[0] + dx) * g.s, g.oy + (r[1] + dy) * g.s]; }; };
+    else map = (tt) => { const [x, y, r, t0] = LEAF_IN[k], q = 1 - sp(P(tt, t0, 0.55), 9); return (p) => { const r2 = rotAbout(p, MOD[k].c, deg(r) * q); return [MO[0] + r2[0] * MS + x * q, MO[1] + r2[1] * MS + y * q]; }; };
+    el.setAttribute('d', ptsD(MOON_MOVE[k] ? modulePts(k, openQ(t)) : MOD[k].pts, map(t)));
+    const v2 = vel((tt) => map(tt)(MOD[k].c), t); setBlur(mblur[i], el, v2[0], v2[1]);
+  });
+  // the wordmark (a band of light), the descriptor, the signature
+  const sw = lerp(WX0 - 260, WX1 + 260, eo(P(t, 10.5, 0.75), 3)); wSweep.setAttribute('x1', f1(sw - 130)); wSweep.setAttribute('x2', f1(sw + 130));
+  vis(wordG, t >= 10.5);
+  tf(desc, `translate(0 ${f1(44 * (1 - sp(P(t, 11.25, 0.45), 9)))})`);
+  const so = eo(P(t, 12.0, 0.65), 5), half = SIG[0].w / 2 * so + 1; sRect.setAttribute('x', f1(W / 2 - half)); sRect.setAttribute('width', f1(2 * half)); sig.forEach((e) => vis(e, so > 0.002));
+}
+
+window.seek = (t) => { t = clamp(t, 0, DUR); seekWorld(t); seekLine(t); seekReveal(t); return true; };
+window.__ready = document.fonts.load("500 30px Montserrat").then(() => document.fonts.ready).then(() => Promise.all([...document.querySelectorAll('image')].map((im) => new Promise((r) => { const i = new Image(); i.onload = r; i.onerror = r; i.src = im.href.baseVal; })))).then(() => { window.seek(0); return true; });
+__AUDIO__
+})();
+</script>
+</body>
+</html>
