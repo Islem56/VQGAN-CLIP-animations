@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AURA LUNA — Lunaison</title>
+<meta name="viewport" content="width=1920, height=1080">
+<style>
+@font-face{font-family:"Display";src:url(data:font/woff2;base64,__FONT_B64__) format("woff2");font-weight:100 900;font-display:block}
+html,body{margin:0;background:#0C0C12;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#0C0C12;font-family:"Display",sans-serif;-webkit-font-smoothing:antialiased}
+.layer{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;display:none}
+.layer>svg{position:absolute;left:0;top:0}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="defs" width="0" height="0" style="position:absolute"></svg>
+<script>
+/* AURA LUNA — "LUNAISON" · 15 s · 96 BPM · 1920x1080
+   The monogram is built from quarter discs and half discs: moon phases. The film is one lunar cycle: the mark comes apart
+   into a moon, the moon wanes into type, the type becomes a grid of phases, the grid lights up as a sphere, the sphere
+   lights a brand board, and the board's ink becomes the night the mark is rebuilt in. The last frame is the first frame.
+   Everything on screen is a pure function of time: window.seek(t). No CSS animations, no timers, no state between frames.
+   One typeface (Jost, variable), three colours (nuit, lune, aura) + a deeper black for the shadow side of the moon. */
+(() => {
+'use strict';
+const G = __GLYPHS__, MONO = __MONO__;
+const W = 1920, H = 1080, BEAT = 0.625, UPM = G.upm, CAP = G.capH;
+
+/* ───────────── maths · colour · easing ───────────── */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const f1 = (n) => Math.round(n * 10) / 10, f2 = (n) => Math.round(n * 100) / 100;
+const P = (t, t0, d) => clamp((t - t0) / d);                       // progress 0→1 of a move starting at t0, lasting d
+const eo = (p, k = 6) => (1 - Math.exp(-k * p)) / (1 - Math.exp(-k));       // exponential out
+const ei = (p, k = 5) => (Math.exp(k * p) - 1) / (Math.exp(k) - 1);         // exponential in (push-through)
+const sp = (p, w = 11) => { const f = (x) => 1 - (1 + w * x) * Math.exp(-w * x); return f(p) / f(1); }; // critically damped spring, no overshoot
+const kf = (t, keys, w = 8) => {                                   // spring-eased keyframes [[t, v], …]
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) return lerp(keys[i - 1][1], keys[i][1], sp(P(t, keys[i - 1][0], keys[i][0] - keys[i - 1][0]), w));
+  return keys[keys.length - 1][1];
+};
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const rgb = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+const deg = (d) => d * Math.PI / 180;
+/* the palette: NUIT (ink / the night), LUNE (paper / moonlight), AURA (the accent), and the moon's shadow side */
+const PAL = { NUIT: '#171A33', LUNE: '#F2EDE5', AURA: '#E3A58F', OMBRE: '#0C0C12' };
+const COL = { N: hex(PAL.NUIT), L: hex(PAL.LUNE), A: hex(PAL.AURA), K: hex(PAL.OMBRE) };
+const C = { N: rgb(COL.N), L: rgb(COL.L), A: rgb(COL.A), K: rgb(COL.K) };
+
+/* ───────────── dom helpers ───────────── */
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const stage = document.getElementById('stage'), defs = document.getElementById('defs');
+const mkLayer = () => { const d = document.createElement('div'); d.className = 'layer'; stage.appendChild(d); const s = S('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, d); return { d, s }; };
+const show = (L, on) => { const v = on ? 'block' : 'none'; if (L.d.style.display !== v) L.d.style.display = v; };
+const vis = (el, on) => { const v = on ? '' : 'none'; if (el.style.display !== v) el.style.display = v; };
+const type = (w, size, ls = 0) => `font-family:Display,sans-serif;font-weight:${w};font-variation-settings:'wght' ${w};font-size:${size}px;letter-spacing:${ls}px`;
+const txt = (parent, x, y, s, style, fill, anchor = 'start') => { const e = S('text', { x, y, fill, 'text-anchor': anchor, style }, parent); e.textContent = s; return e; };
+
+/* motion blur that follows speed AND direction (an SVG blur with separate x / y deviations, set from the velocity) */
+const BLUR_K = 0.0042, BLUR_MAX = 46, blurs = [];
+const mkBlur = (r = 30) => { const f = S('filter', { id: 'mb' + blurs.length, x: `-${r}%`, y: `-${r}%`, width: `${100 + 2 * r}%`, height: `${100 + 2 * r}%`, 'color-interpolation-filters': 'sRGB' }, defs); blurs.push(S('feGaussianBlur', { stdDeviation: '0 0' }, f)); return blurs.length - 1; };
+const setBlur = (i, el, vx, vy) => {
+  const sx = Math.min(BLUR_MAX, Math.abs(vx) * BLUR_K), sy = Math.min(BLUR_MAX, Math.abs(vy) * BLUR_K);
+  if (sx + sy < 0.4) { if (el.style.filter) el.style.filter = ''; return; }
+  blurs[i].setAttribute('stdDeviation', `${f2(sx)} ${f2(sy)}`); el.style.filter = `url(#mb${i})`;
+};
+const vel = (fn, t) => { const d = 1 / 75, a = fn(t - d), b = fn(t); return [(b[0] - a[0]) / d, (b[1] - a[1]) / d]; };   // backward difference: zero speed on the very first frame
+
+/* ───────────── glyphs (Jost outlines at wght 100 and 500, interpolated) ───────────── */
+const glyphAdv = (ch, k) => lerp(G.thin[ch].adv, G.med[ch].adv, k);
+const glyphD = (ch, k, size) => {
+  const a = G.thin[ch].loops, b = G.med[ch].loops, s = size / UPM; let d = '';
+  for (let i = 0; i < a.length; i++) { const la = a[i], lb = b[i]; d += 'M'; for (let j = 0; j < la.length; j += 2) d += (j ? 'L' : '') + f1(lerp(la[j], lb[j], k) * s) + ' ' + f1(-lerp(la[j + 1], lb[j + 1], k) * s); d += 'Z'; }
+  return d;
+};
+const loopsD = (loops, size) => { const s = size / UPM; let d = ''; for (const l of loops) { d += 'M'; for (let j = 0; j < l.length; j += 2) d += (j ? 'L' : '') + f1(l[j] * s) + ' ' + f1(-l[j + 1] * s); d += 'Z'; } return d; };
+
+/* ───────────── the monogram (traced from the logo: the whole mark, and the six modules it is built from) ───────────── */
+const pairs = (fl) => { const o = []; for (let i = 0; i < fl.length; i += 2) o.push([fl[i], fl[i + 1]]); return o; };
+const UNION = MONO.union.map(pairs), MOD = {};
+for (const k in MONO.modules) MOD[k] = { pts: pairs(MONO.modules[k].loop), c: MONO.modules[k].c };
+const MK = ['At', 'Ab', 'S', 'B', 'C', 'D'];
+const ptsD = (pts, map) => 'M' + pts.map((p) => { const q = map(p); return f1(q[0]) + ' ' + f1(q[1]); }).join('L') + 'Z';
+const rotAbout = (p, c, a) => { const ca = Math.cos(a), sa = Math.sin(a), x = p[0] - c[0], y = p[1] - c[1]; return [c[0] + x * ca - y * sa, c[1] + x * sa + y * ca]; };
+/* the end title (= the first frame): mark, wordmark, signature */
+const MS = 0.75, MX0 = (W - MONO.w * MS) / 2, MY0 = 318;
+const toEnd = (p) => [MX0 + p[0] * MS, MY0 + p[1] * MS];
+const UNION_D = UNION.map((l) => ptsD(l, toEnd)).join('');
+const WS = 84, wsk = WS / UPM, WTR = 420, WSP = 300, WORD = 'AURA LUNA', WB = 686;
+const WX = []; { let x = 0; for (const ch of WORD) { WX.push(x); x += ch === ' ' ? WSP : G.mark[ch].adv + WTR; } }
+const WTOT = (WX[WX.length - 1] + G.mark.A.adv) * wsk, WX0 = (W - WTOT) / 2;
+const TAG = 'DES VISIONS CRÉATIVES. DES UNIVERS SINGULIERS.', TB = 744;
+/* the moon hidden in the mark: the half disc's circle, and ideal versions of the three modules that close it */
+const R0 = 151.6, MC = [303.5, 150];
+const arcPts = (cx, cy, r, a0, a1, n) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; });
+const IDEAL = { S: arcPts(MC[0], MC[1], R0, Math.PI, 2 * Math.PI, 96), B: [[300, 150], ...arcPts(300, 150, R0, Math.PI / 2, Math.PI, 48)], C: [[455, 150], ...arcPts(455, 150, R0, Math.PI / 2, Math.PI, 48)] };
+const NRAY = 1440, RAYS = Array.from({ length: NRAY }, (_, i) => i / NRAY * 2 * Math.PI);
+const rayHit = (poly, o, a) => { const dx = Math.cos(a), dy = Math.sin(a); let best = Infinity; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], px = p[0] - o[0], py = p[1] - o[1], ex = q[0] - p[0], ey = q[1] - p[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue; const tt = (px * ey - py * ex) / den, uu = (px * dy - py * dx) / den; if (tt > 1e-6 && uu >= -1e-9 && uu <= 1 + 1e-9 && tt < best) best = tt; } return best; };
+const RAD = {}; for (const k of ['S', 'B', 'C']) RAD[k] = { a: RAYS.map((a) => rayHit(MOD[k].pts, MOD[k].c, a)), b: RAYS.map((a) => rayHit(IDEAL[k], MOD[k].c, a)) };
+const modulePts = (k, m) => (m <= 0 || !RAD[k] ? MOD[k].pts : RAYS.map((a, i) => { const r = lerp(RAD[k].a[i], RAD[k].b[i], m); return [MOD[k].c[0] + r * Math.cos(a), MOD[k].c[1] + r * Math.sin(a)]; }));
+/* a moon phase: the lit part of a disc, lit from the right; k = −1 full … 0 half … 1 new */
+const phaseD = (cx, cy, R, k, n = 72) => {
+  let d = '';
+  for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; d += (i ? 'L' : 'M') + f1(cx + R * Math.cos(a)) + ' ' + f1(cy + R * Math.sin(a)); }
+  for (let i = n; i >= 0; i--) { const a = -Math.PI / 2 + Math.PI * i / n; d += 'L' + f1(cx + k * R * Math.cos(a)) + ' ' + f1(cy + R * Math.sin(a)); }
+  return d + 'Z';
+};
+
+/* ───────────── layers, in time order ───────────── */
+const LH = mkLayer(), LK = mkLayer(), LT = mkLayer(), LS = mkLayer(), LC = mkLayer(), LF = mkLayer();
+
+/* the end-title lock-up, built in a layer (the hook starts from it, the finale ends on it) */
+function lockup(L, id) {
+  const o = {};
+  S('rect', { width: W, height: H, fill: C.N }, L.s);
+  o.union = S('path', { d: UNION_D, fill: C.L }, L.s);
+  o.mods = MK.map(() => S('path', { fill: C.L, stroke: C.L, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }, L.s)); o.mblur = MK.map(() => mkBlur());   // the stroke is a hairline bleed: touching modules show no seam
+  const cw = S('clipPath', { id: 'cw' + id }, L.s); S('rect', { x: 0, y: 0, width: W, height: WB + 2 }, cw);
+  o.wg = S('g', { 'clip-path': `url(#cw${id})` }, L.s);
+  o.letters = [...WORD].map((ch, i) => (ch === ' ' ? null : S('path', { d: loopsD(G.mark[ch].loops, WS), fill: C.L }, o.wg)));
+  const ct = S('clipPath', { id: 'ct' + id }, L.s); o.tclip = S('rect', { x: 0, y: TB - 40, width: W, height: 60 }, ct);
+  o.tag = S('text', { x: f1(WX0), y: TB, textLength: f1(WTOT), lengthAdjust: 'spacing', fill: C.A, style: type(400, 17), 'clip-path': `url(#ct${id})` }, L.s); o.tag.textContent = TAG;
+  return o;
+}
+// letters drop out of (or rise into) the wordmark's baseline; the signature opens from (or closes into) its centre
+function paintLockup(o, wordDrop, tagOpen) {
+  [...WORD].forEach((ch, i) => { if (o.letters[i]) o.letters[i].setAttribute('transform', `translate(${f1(WX0 + WX[i] * wsk)} ${f1(WB + wordDrop(i))})`); });
+  const half = WTOT / 2 * tagOpen + 1; o.tclip.setAttribute('x', f1(W / 2 - half)); o.tclip.setAttribute('width', f1(2 * half));
+}
+
+/* ===================== 1 · HOOK — the mark becomes the moon  (0 – 2.5 s) ===================== */
+const hk = lockup(LH, 'h');
+hk.mg = S('g', {}, LH.s); hk.mgBlur = mkBlur(); ['S', 'B', 'C'].forEach((k) => hk.mg.appendChild(hk.mods[MK.indexOf(k)]));   // one blur for the three: no seams between them
+hk.zoom = S('g', {}, LH.s); hk.zblur = mkBlur(60); hk.zg = S('g', {}, hk.zoom);
+hk.ring = S('ellipse', { fill: 'none', stroke: C.A, 'stroke-width': 3 }, hk.zg);
+hk.moon = S('path', { fill: C.L }, hk.zg);
+const HK_EXIT = { At: [-1300, -60, 0.06], Ab: [-1300, 60, 0.11], D: [1300, 0, 0.08] };     // the leaves leave the frame…
+const hkQ = (t) => sp(P(t, 0.12, 0.5), 9);                                                  // …the half disc and the two quarters close into a moon
+const HK_MOVE = { S: () => [0, 0, 0, MC], B: (q) => [3.5 * q, 0, 0, [300, 150]], C: (q) => [-151.5 * q, 0, -Math.PI / 2 * q, [455, 150]] };
+const MR = 270 / R0, HK_END = toEnd(MC);
+const hkGroup = (t) => {                                                                    // logo units → screen: the mark's place → the moon's place
+  const k = sp(P(t, 0.3, 0.7), 8), s = Math.exp(lerp(Math.log(MS), Math.log(MR), k));
+  const cx = lerp(HK_END[0], W / 2, k), cy = lerp(HK_END[1], H / 2, k);
+  return { s, ox: cx - MC[0] * s, oy: cy - MC[1] * s, cx, cy };
+};
+const hkPhase = (t) => kf(t, [[1.25, -1], [1.9, 0.84]], 7);
+const HK_Z = (t) => { const g = hkGroup(t); return [g.cx + (hkPhase(t) + 1) / 2 * R0 * g.s, g.cy]; };   // the middle of the crescent's lit sliver
+const hkZoom = (t) => Math.exp(Math.log(70) * ei(P(t, 2.0, 0.5), 3.4));
+function hook(t) {
+  paintLockup(hk, (i) => 1.25 * CAP * wsk * sp(P(t, 0.02 + 0.025 * i, 0.4), 8), 1 - eo(P(t, 0, 0.32), 5));
+  const moving = t >= 0.06, g = hkGroup(t), q = hkQ(t), moon = t >= 0.62;
+  vis(hk.union, !moving);
+  MK.forEach((k, i) => {
+    const el = hk.mods[i]; vis(el, moving && !(moon && HK_MOVE[k]));
+    if (!moving || (moon && HK_MOVE[k])) return;
+    if (HK_EXIT[k]) {
+      const [ex, ey, t0] = HK_EXIT[k], off = (tt) => { const e = sp(P(tt, t0, 0.42), 8); return [ex * e, ey * e]; }, o = off(t);
+      el.setAttribute('d', ptsD(MOD[k].pts, (p) => { const s = toEnd(p); return [s[0] + o[0], s[1] + o[1]]; }));
+      const v = vel(off, t); setBlur(hk.mblur[i], el, v[0], v[1]);
+    } else {
+      const map = (tt) => { const gg = hkGroup(tt), [dx, dy, rot, piv] = HK_MOVE[k](hkQ(tt)); return (p) => { const r = rotAbout(p, piv, rot); return [gg.ox + (r[0] + dx) * gg.s, gg.oy + (r[1] + dy) * gg.s]; }; };
+      el.setAttribute('d', ptsD(modulePts(k, q), map(t)));
+    }
+  });
+  if (moving && !moon) { const v = vel((tt) => { const gg = hkGroup(tt); return [gg.cx + R0 * gg.s, gg.cy + R0 * gg.s]; }, t); setBlur(hk.mgBlur, hk.mg, v[0], v[1]); } else setBlur(hk.mgBlur, hk.mg, 0, 0);
+  vis(hk.moon, moon); vis(hk.ring, t >= 0.625);
+  const R = R0 * g.s;
+  if (moon) hk.moon.setAttribute('d', phaseD(g.cx, g.cy, R, hkPhase(t)));
+  if (t >= 0.625) {                                                                         // the aura: a hairline ring that opens on the lock, then tilts
+    const rr = R * (1 + 0.22 * sp(P(t, 0.625, 0.55), 8)), tilt = sp(P(t, 1.875, 0.45), 8);
+    hk.ring.setAttribute('cx', f1(g.cx)); hk.ring.setAttribute('cy', f1(g.cy)); hk.ring.setAttribute('rx', f1(rr)); hk.ring.setAttribute('ry', f1(rr * (1 - 0.74 * tilt)));
+    hk.ring.setAttribute('transform', `rotate(${f2(-16 * tilt)} ${f1(g.cx)} ${f1(g.cy)})`);
+  }
+  // push-through: the camera dives into the crescent's lit sliver, which becomes the next ground
+  if (t >= 2.0) {
+    const z = hkZoom(t), Z = HK_Z(t), e = ei(P(t, 2.0, 0.5), 3.4), F = [lerp(Z[0], W / 2, e), lerp(Z[1], H / 2, e)];
+    hk.zg.setAttribute('transform', `translate(${f1(F[0])} ${f1(F[1])}) scale(${z.toFixed(4)}) translate(${f1(-Z[0])} ${f1(-Z[1])})`);
+    const dz = (Math.log(hkZoom(t)) - Math.log(hkZoom(t - 1 / 75))) * 75; setBlur(hk.zblur, hk.zoom, dz * 160, dz * 160);
+  } else { hk.zg.removeAttribute('transform'); setBlur(hk.zblur, hk.zoom, 0, 0); }
+}
+
+/* ===================== 2 · KINETIC TYPE — IDENTITÉ · IMAGE · MOTION · UNIVERS  (2.5 – 5 s) ===================== */
+const kn = {}; S('rect', { width: W, height: H, fill: C.L }, LK.s);
+const KTR = 30, wsize = {}, fitSize = (word, maxW, maxSize) => { let u = 0; for (const ch of word) u += G.med[ch].adv + KTR; return Math.min(maxSize, maxW * UPM / (u - KTR)); };
+[['IDENTITÉ', 1500, 330], ['IMAGE', 1200, 300], ['MOTION', 1400, 330], ['UNIVERS', 1500, 330]].forEach(([w, mw, ms]) => { wsize[w] = fitSize(w, mw, ms); });
+const capPx = (w) => CAP * wsize[w] / UPM, baseOf = (w) => H / 2 + capPx(w) / 2;
+const layout = (word, ks, tr) => { const s = wsize[word] / UPM; let x = 0; const xs = []; for (let i = 0; i < word.length; i++) { xs.push(x); x += (glyphAdv(word[i], ks[i]) + tr) * s; } return { xs, total: x - tr * s }; };
+const mkWord = (word, parent, fills) => [...word].map((ch, i) => S('path', { fill: fills ? fills[i] : C.N }, parent));
+const paintWord = (paths, word, ks, opt = {}) => {
+  const tr = opt.tr ?? KTR, lay = layout(word, ks, tr), x0 = (opt.cx ?? W / 2) - lay.total / 2, base = baseOf(word), s = wsize[word] / UPM;
+  [...word].forEach((ch, i) => {
+    const x = x0 + lay.xs[i], sx = opt.sx ? opt.sx[i] : 1;
+    let tf = `translate(${f1(x)} ${f1(base + (opt.dy ? opt.dy[i] : 0))})`;
+    if (sx !== 1) { const c = glyphAdv(ch, ks[i]) * s / 2; tf += ` translate(${f1(c)} 0) scale(${Math.max(0.001, sx).toFixed(4)} 1) translate(${f1(-c)} 0)`; }
+    paths[i].setAttribute('d', glyphD(ch, ks[i], wsize[word])); paths[i].setAttribute('transform', tf);
+  });
+};
+// IDENTITÉ — lit by a terminator: a huge disc's limb sweeps in, a second one (the shadow) follows and takes it away
+const RM = 1700, mId = S('mask', { id: 'mId', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, LK.s);
+kn.lit = S('circle', { cy: H / 2, r: RM, fill: '#fff' }, mId); kn.shade = S('circle', { cy: H / 2, r: RM, fill: '#000' }, mId);
+kn.gId = S('g', { mask: 'url(#mId)' }, LK.s); kn.pId = mkWord('IDENTITÉ', kn.gId);
+// IMAGE — a shutter: two bars close, open onto a letterbox, close again, open on the next word
+kn.gIm = S('g', {}, LK.s); kn.pIm = mkWord('IMAGE', kn.gIm);
+// MOTION — the letters flip in one by one (its O is the moon, in aura); then the word is pushed out by UNIVERS
+kn.gMo = S('g', {}, LK.s); kn.pMo = mkWord('MOTION', kn.gMo, [...'MOTION'].map((c) => (c === 'O' ? C.A : C.N))); kn.bMo = mkBlur();
+kn.gUn = S('g', {}, LK.s); kn.pUn = mkWord('UNIVERS', kn.gUn); kn.bUn = mkBlur();
+kn.barT = S('rect', { x: 0, y: 0, width: W, fill: C.N }, LK.s); kn.barB = S('rect', { x: 0, width: W, fill: C.N }, LK.s);
+// the exit: a quarter disc pivots on the bottom-left corner and sweeps the frame (the next scene is made of quarter discs)
+kn.sector = S('path', { fill: C.N }, LK.s);
+const barH = (t) => {
+  if (t < 3.0) return 0;
+  if (t < 3.125) return 540 * ei(P(t, 3.0, 0.12), 3);
+  if (t < 3.6) return lerp(540, 350, sp(P(t, 3.125, 0.3), 9));
+  if (t < 3.75) return lerp(350, 540, ei(P(t, 3.62, 0.12), 3));
+  return 540 * (1 - sp(P(t, 3.75, 0.34), 9));
+};
+const moX = (t) => -2300 * ei(P(t, 4.28, 0.14), 3), unQ = (t) => sp(P(t, 4.3, 0.5), 8);
+function kinetic(t) {
+  // IDENTITÉ
+  const onId = t < 3.13; vis(kn.gId, onId);
+  if (onId) {
+    kn.lit.setAttribute('cx', f1(lerp(-160, 2200, eo(P(t, 2.5, 0.42), 4)) - RM)); kn.shade.setAttribute('cx', f1(lerp(-160, 2200, ei(P(t, 2.9, 0.22), 3)) - RM));
+    paintWord(kn.pId, 'IDENTITÉ', [...'IDENTITÉ'].map((_, i) => sp(P(t, 2.52 + 0.03 * i, 0.42), 8)), { cx: W / 2 + 20 - 40 * (t - 2.5) });
+  }
+  // IMAGE
+  const onIm = t >= 3.1 && t < 3.76; vis(kn.gIm, onIm);
+  if (onIm) {
+    const s = lerp(1.1, 1, sp(P(t, 3.125, 0.5), 8));
+    paintWord(kn.pIm, 'IMAGE', [...'IMAGE'].map((_, i) => sp(P(t, 3.125 + 0.03 * i, 0.36), 8)));
+    kn.gIm.setAttribute('transform', `translate(${W / 2} ${H / 2}) scale(${s.toFixed(4)}) translate(${-W / 2} ${-H / 2})`);
+  }
+  const bh = barH(t); kn.barT.setAttribute('height', f1(bh)); kn.barB.setAttribute('y', f1(H - bh)); kn.barB.setAttribute('height', f1(bh));
+  // MOTION
+  const onMo = t >= 3.74 && t < 4.43; vis(kn.gMo, onMo);
+  if (onMo) {
+    const qs = [...'MOTION'].map((_, i) => sp(P(t, 3.75 + 0.045 * i, 0.3), 9));
+    paintWord(kn.pMo, 'MOTION', qs, { sx: qs, cx: W / 2 + moX(t) });
+    const v = vel((tt) => [moX(tt), 0], t); setBlur(kn.bMo, kn.gMo, v[0], 0);
+  }
+  // UNIVERS: from very wide tracking to its own, pushing MOTION out
+  const onUn = t >= 4.3; vis(kn.gUn, onUn);
+  if (onUn) {
+    const q = unQ(t), ux = (tt) => 1300 * (1 - unQ(tt));
+    paintWord(kn.pUn, 'UNIVERS', [...'UNIVERS'].map((_, i) => sp(P(t, 4.375 + 0.03 * i, 0.4), 8)), { tr: lerp(1400, KTR, q), cx: W / 2 + ux(t) });
+    const v = vel((tt) => [ux(tt), 0], t); setBlur(kn.bUn, kn.gUn, v[0], 0);
+  }
+  // the sector sweep
+  const a0 = deg(90 * (1 - ei(P(t, 4.62, 0.38), 2.6))), RS = 2500; vis(kn.sector, t >= 4.62);
+  if (t >= 4.62) { let d = 'M0 ' + H; for (let i = 0; i <= 24; i++) { const a = a0 + deg(90) * i / 24; d += 'L' + f1(RS * Math.cos(a)) + ' ' + f1(H - RS * Math.sin(a)); } kn.sector.setAttribute('d', d + 'Z'); }
+}
+
+/* ===================== 3 · SHAPE — a grid of phases  (5 – 7.5 s) ===================== */
+/* 8 × 6 tiles of 240 px; each holds a quarter disc anchored on one corner (0 TL, 1 TR, 2 BR, 3 BL). On every beat the
+   quarters turn and the grid spells another figure of the monogram: arches (its half disc), leaves (its side modules),
+   stars, then moons. The four tiles in the middle keep their moon: it becomes the sphere. */
+const tl = { tiles: [] }; S('rect', { width: W, height: H, fill: C.N }, LT.s);
+const TS = 240, NI = 8, NJ = 6, TY0 = -180;
+const PAT = {
+  arch: (i, j) => (i % 2 === 1 ? 2 : 3),
+  leaf: (i, j) => (i % 2 === 1 ? (j % 2 === 0 ? 3 : 1) : (j % 2 === 0 ? 2 : 0)),
+  star: (i, j) => { const l = i % 2 === 1, tp = j % 2 === 0; return tp ? (l ? 0 : 1) : (l ? 3 : 2); },
+  moon: (i, j) => { const l = i % 2 === 1, tp = j % 2 === 0; return tp ? (l ? 2 : 3) : (l ? 1 : 0); },
+};
+const SEQ = ['arch', 'leaf', 'star', 'moon'], TURN = [5.625, 6.25, 6.875];
+const isCore = (i, j) => (i === 3 || i === 4) && (j === 2 || j === 3);
+for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
+  const x0 = i * TS, y0 = TY0 + j * TS, bi = Math.floor((i + 1) / 2), bj = Math.floor(j / 2);
+  const fill = (bi + bj) % 2 === 0 ? C.A : C.L;
+  const states = SEQ.map((n) => PAT[n](i, j)), turns = [];
+  for (let s = 1; s < states.length; s++) { let d = ((states[s] - states[s - 1]) % 4 + 4) % 4; if (d === 3) d = -1; if (d === 2 && (i + j) % 2) d = -2; turns.push(d); }
+  const dist = Math.hypot(i + 0.5 - NI / 2, j + 0.5 - (540 - TY0) / TS), bx = (i % 2 === 1 ? i + 1 : i) * TS, by = TY0 + (j % 2 === 0 ? j + 1 : j) * TS, bdist = Math.hypot(bx - W / 2, by - H / 2) / TS;
+  const delays = [0.022 * i, 0.03 * j, 0.015 * dist];
+  const el = S('path', { fill, stroke: fill, 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, LT.s);   // the stroke hides the seams between touching quarters
+  tl.tiles.push({ i, j, x0, y0, el, q0: states[0], turns, delays, dist, bdist, core: isCore(i, j), blur: mkBlur(20) });
+}
+const DMAX = Math.max(...tl.tiles.map((T_) => T_.bdist));
+const tileAng = (T_, t) => { let q = T_.q0; T_.turns.forEach((d, b) => { q += d * sp(P(t, TURN[b] + T_.delays[b], b === 2 ? 0.28 : 0.34), 9); }); return q * 90; };
+const tileR = (T_, t) => {
+  const grow = sp(P(t, 5.0 + 0.016 * (T_.i + (NJ - 1 - T_.j)), 0.36), 9);
+  const shrink = T_.core ? 0 : sp(P(t, 7.1 + 0.05 * (DMAX - T_.bdist), 0.25), 9);
+  return TS * grow * (1 - shrink);
+};
+function tiles(t) {
+  for (const T_ of tl.tiles) {
+    const r = tileR(T_, t); vis(T_.el, r > 0.5); if (r <= 0.5) continue;
+    const a = tileAng(T_, t), cx = T_.x0 + TS / 2, cy = T_.y0 + TS / 2;
+    T_.el.setAttribute('d', `M${T_.x0} ${T_.y0}L${f1(T_.x0 + r)} ${T_.y0}A${f1(r)} ${f1(r)} 0 0 1 ${T_.x0} ${f1(T_.y0 + r)}Z`);
+    T_.el.setAttribute('transform', `rotate(${f2(a)} ${cx} ${cy})`);
+    const w = (tileAng(T_, t) - tileAng(T_, t - 1 / 75)) * 75; const bw = Math.min(14 / BLUR_K, Math.abs(deg(w)) * TS * 0.16); setBlur(T_.blur, T_.el, bw, bw);
+  }
+}
+
+/* ===================== 4 · 2D → 3D — light on the moon  (7.5 – 10 s) ===================== */
+/* The flat moon becomes a sphere: a light orbits it and the shading is posterised into three tones (lune, aura, ombre),
+   the band edges computed exactly (each is the outline of a spherical cap, projected). An aura ring turns around it in 3D. */
+const sh = {}; S('rect', { width: W, height: H, fill: C.N }, LS.s);
+sh.zoom = S('g', {}, LS.s); sh.zblur = mkBlur(60);
+sh.ringB = S('path', { fill: 'none', stroke: C.A, 'stroke-width': 4 }, sh.zoom);
+sh.base = S('circle', { fill: C.K }, sh.zoom); sh.mid = S('path', { fill: C.A, 'fill-rule': 'evenodd' }, sh.zoom); sh.top = S('path', { fill: C.L, 'fill-rule': 'evenodd' }, sh.zoom);
+sh.ringF = S('path', { fill: 'none', stroke: C.A, 'stroke-width': 4 }, sh.zoom);
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); };
+function capD(cx, cy, R, L, c) {               // the part of the visible hemisphere where n·L ≥ c, as an SVG path (x right, y down, z toward us)
+  const [lx, ly, lz] = L, u = norm(Math.abs(lz) < 0.9 ? cross(L, [0, 0, 1]) : cross(L, [1, 0, 0])), v = cross(L, u), s = Math.sqrt(Math.max(0, 1 - c * c));
+  const Pt = (th) => [0, 1, 2].map((k) => c * L[k] + s * (u[k] * Math.cos(th) + v[k] * Math.sin(th)));
+  const xy = (p) => f1(cx + R * p[0]) + ' ' + f1(cy + R * p[1]);
+  const disc = () => { let d = ''; for (let i = 0; i < 120; i++) { const a = i / 120 * 2 * Math.PI; d += (i ? 'L' : 'M') + f1(cx + R * Math.cos(a)) + ' ' + f1(cy + R * Math.sin(a)); } return d + 'Z'; };
+  const ell = () => { let d = ''; for (let i = 0; i < 120; i++) d += (i ? 'L' : 'M') + xy(Pt(i / 120 * 2 * Math.PI)); return d + 'Z'; };
+  const A = s * u[2], B = s * v[2], amp = Math.hypot(A, B), rhs = -c * lz;
+  if (amp < 1e-9 || Math.abs(rhs) >= amp) {                    // the cap's edge never meets the limb
+    if (Pt(0)[2] <= 0) return lz >= c ? disc() : '';          // edge behind: the whole visible disc, or nothing
+    return lz > 0 ? ell() : disc() + ell();                    // edge in front: inside it, or the disc minus it (even-odd)
+  }
+  const ph = Math.atan2(B, A), dl = Math.acos(clamp(rhs / amp, -1, 1)), N = 72;
+  let d = ''; for (let i = 0; i <= N; i++) d += (i ? 'L' : 'M') + xy(Pt(ph - dl + 2 * dl * i / N));
+  const e1 = Pt(ph - dl), e2 = Pt(ph + dl), p1 = Math.atan2(e1[1], e1[0]); let p2 = Math.atan2(e2[1], e2[0]);
+  // back along the limb, on the side that is inside the cap
+  let span = ((p1 - p2) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI); const mid = p2 + span / 2;
+  if (lx * Math.cos(mid) + ly * Math.sin(mid) < c) span -= 2 * Math.PI;
+  for (let i = 1; i < 48; i++) { const a = p2 + span * i / 48; d += 'L' + f1(cx + R * Math.cos(a)) + ' ' + f1(cy + R * Math.sin(a)); }
+  return d + 'Z';
+}
+const LIGHT_AZ = [[7.5, 0], [7.64, -52], [8.125, -52], [8.36, 62], [8.75, 62], [9.0, 138], [9.375, 138], [9.56, 18]];
+const LIGHT_EL = [[7.5, 0], [7.64, 26], [8.36, 8], [9.0, 30], [9.56, 22]];
+const lightAt = (t) => { const az = deg(kf(t, LIGHT_AZ, 9)), el = deg(kf(t, LIGHT_EL, 9)); return [Math.sin(az) * Math.cos(el), -Math.sin(el), Math.cos(az) * Math.cos(el)]; };
+const sphR = (t) => lerp(240, 292, sp(P(t, 7.5, 1.9), 5));
+const ringOf = (t) => ({ b: deg(kf(t, [[7.5, 0], [7.66, 30], [8.125, 30], [8.38, -24], [8.75, -24], [9.02, 42], [9.375, 42]], 9)), r: deg(kf(t, [[7.5, 0], [7.66, -14], [8.38, 12], [9.02, -22]], 9)), k: lerp(1, 1.62, sp(P(t, 7.5, 0.5), 8)) });
+const shZoom = (t) => Math.exp(Math.log(34) * ei(P(t, 9.5, 0.5), 3.2));
+function sphere(t) {
+  const R = sphR(t), L = lightAt(t), pz = sp(P(t, 7.5, 0.16), 9), c1 = lerp(-1, 0.1, pz), c2 = lerp(-1, 0.52, pz);
+  const cx = W / 2, cy = H / 2;
+  sh.base.setAttribute('cx', cx); sh.base.setAttribute('cy', cy); sh.base.setAttribute('r', f1(R));
+  sh.mid.setAttribute('d', capD(cx, cy, R, L, c1)); sh.top.setAttribute('d', capD(cx, cy, R, L, c2));
+  // the aura ring: a circle in 3D (tilt b, roll r), its far half drawn behind the sphere, its near half in front
+  const rg = ringOf(t), RR = R * rg.k, cr = Math.cos(rg.r), sr = Math.sin(rg.r); let dB = '', dF = '', pf = null;
+  for (let i = 0; i <= 160; i++) {
+    const th = i / 160 * 2 * Math.PI, x = Math.cos(th), y = -Math.sin(th) * Math.sin(rg.b), z = Math.sin(th) * Math.cos(rg.b);
+    const X = cx + RR * (x * cr - y * sr), Y = cy + RR * (x * sr + y * cr), front = z >= 0, seg = f1(X) + ' ' + f1(Y);
+    if (front) dF += (pf === true ? 'L' : 'M') + seg; else dB += (pf === false ? 'L' : 'M') + seg;
+    pf = front;
+  }
+  sh.ringB.setAttribute('d', dB); sh.ringF.setAttribute('d', dF);
+  vis(sh.ringB, t >= 7.5 + 1e-3); vis(sh.ringF, t >= 7.5 + 1e-3);
+  // push-through into the brightest point of the moon: the lit paper of the next scene
+  if (t >= 9.5) {
+    const z = shZoom(t), Z = [cx + R * L[0], cy + R * L[1]], e = ei(P(t, 9.5, 0.5), 3.2), F = [lerp(Z[0], cx, e), lerp(Z[1], cy, e)];
+    sh.zoom.setAttribute('transform', `translate(${f1(F[0])} ${f1(F[1])}) scale(${z.toFixed(4)}) translate(${f1(-Z[0])} ${f1(-Z[1])})`);
+    const dz = (Math.log(shZoom(t)) - Math.log(shZoom(t - 1 / 75))) * 75; setBlur(sh.zblur, sh.zoom, dz * 150, dz * 150);
+  } else { sh.zoom.removeAttribute('transform'); setBlur(sh.zblur, sh.zoom, 0, 0); }
+}
+
+/* ===================== 5 · DATA / UI — the brand board  (10 – 12.5 s) ===================== */
+const ch = {}; S('rect', { width: W, height: H, fill: C.L }, LC.s);
+const cHead = S('clipPath', { id: 'cHead' }, LC.s); ch.headClip = S('rect', { x: 0, y: 0, height: H }, cHead);
+ch.head = S('g', { 'clip-path': 'url(#cHead)' }, LC.s);
+txt(ch.head, 120, 112, 'AURA LUNA', type(600, 19, 5.7), C.N); txt(ch.head, 960, 112, 'CHARTE GRAPHIQUE', type(400, 19, 5.7), C.N, 'middle'); txt(ch.head, 1800, 112, '2026', type(400, 19, 5.7), C.N, 'end');
+[[120, '01', 'MONOGRAMME'], [840, '02', 'COULEURS'], [1320, '03', 'TYPOGRAPHIE']].forEach(([x, n, s]) => { txt(ch.head, x, 216, n, type(600, 17, 3.4), C.A); txt(ch.head, x + 46, 216, s, type(500, 17, 5.1), C.N); });
+ch.ruleT = S('line', { x1: 120, y1: 146, y2: 146, stroke: C.N, 'stroke-width': 1.5 }, LC.s); ch.ruleB = S('line', { x2: 1800, y1: 944, y2: 944, stroke: C.N, 'stroke-width': 1.5 }, LC.s);
+// 01 · the construction of the mark: its grid and its circles draw themselves, then the modules fill in
+const CO = [120, 340], co = (p) => [CO[0] + p[0], CO[1] + p[1]];
+ch.cons = [];
+const consLine = (d) => { const e = S('path', { d, fill: 'none', stroke: C.A, 'stroke-width': 1.25, pathLength: 1, 'stroke-dasharray': '1 1' }, LC.s); ch.cons.push(e); };
+[0, 152, 300.5, 455, 640].forEach((u) => consLine(`M${f1(CO[0] + u)} ${CO[1] - 40}V${CO[1] + 340}`));
+[0, 150, 300].forEach((v) => consLine(`M${CO[0] - 40} ${f1(CO[1] + v)}H${CO[0] + 680}`));
+[[0, 150, 152], [152, 150, 152], [MC[0], MC[1], R0], [300, 150, 149], [455, 150, 154]].forEach(([x, y, r]) => { const c = co([x, y]); consLine(`M${f1(c[0] + r)} ${f1(c[1])}A${r} ${r} 0 1 1 ${f1(c[0] - r)} ${f1(c[1])}A${r} ${r} 0 1 1 ${f1(c[0] + r)} ${f1(c[1])}`); });
+ch.mods = MK.map((k) => S('path', { d: ptsD(MOD[k].pts, co), fill: C.N, stroke: C.N, 'stroke-width': 1.2, 'stroke-linejoin': 'round' }, LC.s));
+ch.cap1 = txt(LC.s, 120, 724, 'MODULE 150 · 6 FORMES · 1 CERCLE', type(500, 16, 4.8), C.N);
+// 02 · the palette
+const SW = [['NUIT', PAL.NUIT, C.N], ['AURA', PAL.AURA, C.A], ['LUNE', PAL.LUNE, C.L]], SWX = (i) => 840 + i * 150, SWT = 340, SWB = 690;
+ch.sw = SW.map(([n, h, fill], i) => {
+  const r = S('rect', { x: SWX(i), width: 130, fill, stroke: i === 2 ? C.N : 'none', 'stroke-width': 1.5 }, LC.s);
+  const name = txt(LC.s, SWX(i), 728, n, type(600, 17, 3.4), C.N), code = txt(LC.s, SWX(i), 756, '', type(400, 16, 1.2), C.N);
+  return { r, name, code, hex: h.slice(1) };
+});
+// 03 · the typeface: "Aa" driven by its weight axis, with a slider
+const cAa = S('clipPath', { id: 'cAa' }, LC.s); ch.aaClip = S('rect', { x: 1300, width: 560 }, cAa);
+ch.aa = txt(LC.s, 1316, 606, 'Aa', type(100, 320), C.N); ch.aa.setAttribute('clip-path', 'url(#cAa)');
+ch.track = S('line', { x1: 1320, y1: 690, y2: 690, stroke: C.N, 'stroke-width': 1.5 }, LC.s);
+ch.knob = S('circle', { cy: 690, r: 12, fill: C.A }, LC.s);
+ch.font = txt(LC.s, 1320, 728, 'JOST', type(600, 17, 3.4), C.N); ch.wv = txt(LC.s, 1800, 728, '', type(400, 17, 1.4), C.N, 'end');
+// the exit: the NUIT swatch grows over everything and becomes the night of the end title
+ch.flood = S('rect', { fill: C.N }, LC.s);
+const HEXD = '0123456789ABCDEF', hash = (a, b, c) => { let h = (a * 73856093) ^ (b * 19349663) ^ (c * 83492791); h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) % 16; };
+const wght = (t) => kf(t, [[11.25, 100], [11.72, 900], [12.1, 300]], 8);
+function board(t) {
+  const hq = eo(P(t, 10.0, 0.42), 4); ch.headClip.setAttribute('width', f1(W * hq));
+  ch.ruleT.setAttribute('x2', f1(lerp(120, 1800, eo(P(t, 10.0, 0.4), 5)))); ch.ruleB.setAttribute('x1', f1(lerp(1800, 120, eo(P(t, 10.08, 0.4), 5))));
+  ch.cons.forEach((e, i) => { const q = eo(P(t, 10.02 + 0.035 * i, 0.5), 4); e.setAttribute('stroke-dashoffset', f2(1 - q)); vis(e, q > 0); });
+  ch.mods.forEach((e, i) => {
+    const q = sp(P(t, 10.625 + 0.05 * i, 0.34), 9), c = co(MOD[MK[i]].c); vis(e, q > 0.002);
+    e.setAttribute('transform', `translate(${f1(c[0])} ${f1(c[1])}) scale(${q.toFixed(4)}) translate(${f1(-c[0])} ${f1(-c[1])})`);
+  });
+  vis(ch.cap1, t >= 10.7);
+  ch.sw.forEach((s, i) => {
+    const h = (SWB - SWT) * sp(P(t, 10.625 + 0.07 * i, 0.42), 9); s.r.setAttribute('y', f1(SWB - h)); s.r.setAttribute('height', f1(h)); vis(s.r, h > 0.5);
+    vis(s.name, t >= 10.8 + 0.07 * i);
+    let code = '#'; for (let d = 0; d < 6; d++) { const tt = 11.25 + 0.035 * (i * 6 + d); code += t >= tt + 0.25 ? s.hex[d] : HEXD[hash(Math.floor(t * 40), i, d)]; }
+    s.code.textContent = t >= 11.25 ? code : '';
+  });
+  const aq = sp(P(t, 11.25, 0.4), 9); ch.aaClip.setAttribute('y', f1(lerp(612, 300, aq))); ch.aaClip.setAttribute('height', f1(lerp(0, 312, aq)));
+  const w = wght(t); ch.aa.setAttribute('style', type(Math.round(w), 320));
+  const tq = eo(P(t, 11.25, 0.4), 5); ch.track.setAttribute('x2', f1(lerp(1320, 1800, tq))); vis(ch.knob, t >= 11.25); ch.knob.setAttribute('cx', f1(1320 + 480 * (w - 100) / 800));
+  ch.wv.textContent = t >= 11.25 ? 'wght ' + Math.round(w) : ''; vis(ch.font, t >= 11.25);
+  const fq = ei(P(t, 12.08, 0.4), 3.2), r0 = [SWX(0), SWT, 130, SWB - SWT], r1 = [0, 0, W, H];
+  vis(ch.flood, fq > 0); if (fq > 0) ['x', 'y', 'width', 'height'].forEach((a, k) => ch.flood.setAttribute(a, f1(lerp(r0[k], r1[k], fq))));
+}
+
+/* ===================== 6 · END TITLE — the mark is rebuilt  (12.5 – 15 s) ===================== */
+const fn = lockup(LF, 'f');
+const FN_IN = { At: [-640, -420, -90, 12.5], S: [0, -760, 180, 12.56], D: [880, -140, 90, 12.62], Ab: [-760, 780, 90, 13.125], B: [-60, 820, -90, 13.185], C: [700, 800, 180, 13.245] };
+const fnOff = (k, t) => { const [x, y, r, t0] = FN_IN[k], q = 1 - sp(P(t, t0, 0.5), 9); return [x * q, y * q, deg(r) * q]; };
+const FN_DONE = Math.max(...Object.values(FN_IN).map((v) => v[3])) + 0.5;
+function finale(t) {
+  const done = t >= FN_DONE; vis(fn.union, done);
+  MK.forEach((k, i) => {
+    const el = fn.mods[i]; vis(el, !done); if (done) return;
+    const map = (tt) => { const [x, y, r] = fnOff(k, tt); return (p) => { const q = toEnd(rotAbout(p, MOD[k].c, r)); return [q[0] + x, q[1] + y]; }; };
+    el.setAttribute('d', ptsD(MOD[k].pts, map(t)));
+    const v = vel((tt) => map(tt)(MOD[k].c), t); setBlur(fn.mblur[i], el, v[0], v[1]);
+  });
+  paintLockup(fn, (i) => 1.25 * CAP * wsk * (1 - sp(P(t, 13.75 + 0.035 * i, 0.45), 8)), eo(P(t, 14.375, 0.6), 5));
+}
+
+/* ───────────── the clock ───────────── */
+const SCENES = [[LH, 0, 2.5], [LK, 2.5, 5], [LT, 5, 7.5], [LS, 7.5, 10], [LC, 10, 12.5], [LF, 12.5, 15.0001]];
+window.seek = (t) => {
+  t = clamp(t, 0, 15);
+  SCENES.forEach(([L, a, b]) => show(L, t >= a && t < b));
+  if (t < 2.5) hook(t); else if (t < 5) kinetic(t); else if (t < 7.5) tiles(t); else if (t < 10) sphere(t); else if (t < 12.5) board(t); else finale(t);
+  return true;
+};
+window.__ready = document.fonts.load("300 100px Display").then(() => document.fonts.ready).then(() => { window.seek(0); return true; });
+__AUDIO__
+})();
+</script>
+</body>
+</html>
