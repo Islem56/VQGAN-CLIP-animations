@@ -12,7 +12,8 @@ const WORK = path.resolve(arg('work', path.join(__dirname, 'out', 'frames')));
 const WORKERS = +arg('workers', 4);
 const FPS = 60, SUB = 3, DUR = 15, NF = FPS * DUR;                       // 900 frames, 2700 subframes
 const [F0, F1] = arg('frames', `0:${NF}`).split(':').map(Number);
-const html = 'file://' + path.join(__dirname, 'auraluna-point.html');
+const VERT = arg('format', 'h') === 'v', VW = VERT ? 1080 : 1920, VH = VERT ? 1920 : 1080;   // --format v → the 9:16 film
+const html = 'file://' + path.join(__dirname, VERT ? 'auraluna-point-vertical.html' : 'auraluna-point.html');
 const tSub = (f, j) => (f === 0 ? 0 : Math.min(DUR, Math.max(0, f / FPS + (j - 1) / (FPS * SUB))));   // subframes centred on the frame time; frame 0 is the exact first-frame state (= the last frame)
 
 (async () => {
@@ -31,7 +32,7 @@ const tSub = (f, j) => (f === 0 ? 0 : Math.min(DUR, Math.max(0, f / FPS + (j - 1
   // 2 · frames
   const t0 = Date.now(); let done = 0; const total = (F1 - F0) * SUB;
   await Promise.all(Array.from({ length: WORKERS }, async (_, w) => {
-    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    const page = await browser.newPage({ viewport: { width: VW, height: VH } });
     page.on('pageerror', (e) => console.log('[pageerror]', e.message));
     await page.goto(html); await page.evaluate(() => window.__ready);
     for (let f = F0 + w; f < F1; f += WORKERS) {

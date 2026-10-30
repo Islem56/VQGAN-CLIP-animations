@@ -1,6 +1,8 @@
 # AURA LUNA — "LE POINT"
 
-15 s · 1920×1080 · 60 fps · 120 BPM · loops (the last frame is the first frame).
+15 s · 60 fps · 120 BPM · loops (the last frame is the first frame). Two compositions of the same film, built from one
+source: **16:9** (1920×1080) and **9:16** (1080×1920, recomposed for Reels rather than cropped: a phone-sized settings
+row, the callout above the graph, a vertical pill, a stacked end card). Every position comes from the layout table `LY`.
 
 One orange dot (Éclipse, the brand's signal) connects every scene:
 
@@ -21,7 +23,8 @@ Lunaire canvas, Nuit grounds, Montserrat, the Asik wordmark and gradient monogra
 The spring is closed-form: the same function moves the dot, draws the curve and sets the pitch of its tone.
 
 ```
-auraluna-point.html         the whole film in one self-contained file
+auraluna-point.html         the 16:9 film in one self-contained file
+auraluna-point-vertical.html  the 9:16 film
 src/film.template.html      the film: window.seek(t)
 src/audio.js                the score (Web Audio API, OfflineAudioContext → WAV)
 assets/glyphs.json          « Limit Imagination » in Montserrat, wght 600 → 800   (tools/make-glyphs.py)
@@ -30,6 +33,7 @@ out/stills/                 the four stills approved before the render
 ```
 
 ```bash
-node build.cjs && node snap.cjs out/beats beats     # one frame per beat
+node build.cjs && node snap.cjs out/beats beats     # one frame per beat   (FORMAT=v node snap.cjs … for 9:16)
 node render.cjs                                     # → out/auraluna-point.mp4
+node render.cjs --format v --out out/auraluna-point-vertical.mp4
 ```
