@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AURA LUNA — Le point</title>
+<meta name="viewport" content="width=1920, height=1080">
+<style>
+@font-face{font-family:"Montserrat";src:url(data:font/woff2;base64,__FONT_B64__) format("woff2");font-weight:100 900;font-display:block}
+html,body{margin:0;background:#F4F1F7;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:"Montserrat",sans-serif;-webkit-font-smoothing:antialiased}
+#stage>svg{position:absolute;left:0;top:0}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="defs" width="0" height="0" style="position:absolute"></svg>
+<script>
+/* AURA LUNA — "LE POINT" · 15 s · 120 BPM · 1920x1080
+   One orange dot (Éclipse, the brand's signal) connects every scene. It starts as the toggle of a setting
+   « Limit Imagination »: a cursor switches it off, the label lets go of « Limit » and the dot lands on the i of
+   « Imagination ». It jumps onto a graph and draws a spring that settles on « 6 pôles d'expertise ». It shoots along
+   the target line, lights the frame in Halo violet, seeds a Nuit square that turns, stretches into a pill and becomes
+   the night. The six poles orbit it, open out into a halftone field that grows into the cream of the end card, where
+   the dot becomes the full stop of the signature. Then it travels back through the halftone, the graph and the toggle:
+   the last frame is the first frame.
+   Everything on screen is a pure function of time: window.seek(t). No CSS animations, no timers, no state between frames.
+   Brand: Lunaire canvas, Nuit grounds, Halo violet light, Éclipse orange only as the dot (< 5 % of the surface),
+   Montserrat, the Asik wordmark and the gradient monogram traced from the official logo. */
+(() => {
+'use strict';
+const G = __GLYPHS__, MONO = __MONO__, WM = __WORDMARK__;
+const W = 1920, H = 1080, BEAT = 0.5, DUR = 15;
+window.DUR = DUR;
+
+/* ───────────── maths · springs ───────────── */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const f1 = (n) => Math.round(n * 10) / 10, f2 = (n) => Math.round(n * 100) / 100, f3 = (n) => Math.round(n * 1000) / 1000;
+const P = (t, t0, d) => clamp((t - t0) / d);
+const eo = (p, k = 6) => (1 - Math.exp(-k * p)) / (1 - Math.exp(-k));
+const ei = (p, k = 5) => (Math.exp(k * p) - 1) / (Math.exp(k) - 1);
+/* closed-form spring (step response, damping ratio z, natural frequency w): small overshoot, then rest */
+const springF = (tau, z = 0.6, w = 15) => { if (tau <= 0) return 0; const wd = w * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z / Math.sqrt(1 - z * z)) * Math.sin(wd * tau)); };
+const bounce = (t, t0, d = 0.5, z = 0.6, w = 15) => (t <= t0 ? 0 : t >= t0 + d ? 1 : springF(t - t0, z, w));   // exact 1 once the move is over
+const deg = (d) => d * Math.PI / 180;
+const C = {
+  COSMOS: '#02060E', NUIT: '#1F0533', AURA: '#59047C', LUNA: '#7604A0', HALO: '#9303C5',
+  BLANC: '#FFFFFF', LUNAIRE: '#F4F1F7', BRUME: '#E2D3EC', ARDOISE: '#6E6A75', ECLIPSE: '#D53207',
+};
+
+/* ───────────── dom ───────────── */
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const stage = document.getElementById('stage'), defs = document.getElementById('defs');
+const svg = S('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, stage);
+const vis = (el, on) => { const v = on ? '' : 'none'; if (el.style.display !== v) el.style.display = v; };
+const tf = (el, s) => el.setAttribute('transform', s);
+const type = (w, size, ls = 0) => `font-family:Montserrat,sans-serif;font-weight:${w};font-variation-settings:'wght' ${w};font-size:${size}px;letter-spacing:${ls}px`;
+const txt = (parent, x, y, s, style, fill, anchor = 'start') => { const e = S('text', { x, y, fill, 'text-anchor': anchor, style }, parent); e.textContent = s; return e; };
+const BLUR_K = 0.0042, BLUR_MAX = 40, blurs = [];
+const mkBlur = (r = 40) => { const f = S('filter', { id: 'mb' + blurs.length, x: `-${r}%`, y: `-${r}%`, width: `${100 + 2 * r}%`, height: `${100 + 2 * r}%`, 'color-interpolation-filters': 'sRGB' }, defs); blurs.push(S('feGaussianBlur', { stdDeviation: '0 0' }, f)); return blurs.length - 1; };
+const setBlur = (i, el, vx, vy) => { const sx = Math.min(BLUR_MAX, Math.abs(vx) * BLUR_K), sy = Math.min(BLUR_MAX, Math.abs(vy) * BLUR_K); if (sx + sy < 0.4) { if (el.style.filter) el.style.filter = ''; return; } blurs[i].setAttribute('stdDeviation', `${f2(sx)} ${f2(sy)}`); el.style.filter = `url(#mb${i})`; };
+const vel = (fn, t) => { const d = 1 / 75, a = fn(t - d), b = fn(t); return [(b[0] - a[0]) / d, (b[1] - a[1]) / d]; };
+
+/* ───────────── glyphs: « Limit Imagination », wght 600 (label) → 800 (hero) ───────────── */
+const UPM = G.upm, CAPH = G.capH;
+const gAdv = (ch, k) => lerp(G.label[ch].adv, G.hero[ch].adv, k);
+const gD = (ch, k, size, noTittle) => {
+  const a = G.label[ch].loops, b = G.hero[ch].loops, s = size / UPM; let d = '';
+  for (let i = 0; i < a.length; i++) { if (noTittle && i === G.tittle) continue; const la = a[i], lb = b[i]; d += 'M'; for (let j = 0; j < la.length; j += 2) d += (j ? 'L' : '') + f1(lerp(la[j], lb[j], k) * s) + ' ' + f1(-lerp(la[j + 1], lb[j + 1], k) * s); d += 'Z'; }
+  return d;
+};
+const LABEL = 'Limit Imagination', HERO0 = 6, DOT_I = HERO0 + 4;           // the hero word starts at letter 6; its first lowercase i takes the dot
+const LS = 98, HS = 236;
+const labelX = []; { let x = 0; for (const ch of LABEL) { labelX.push(x); x += gAdv(ch, 0) * LS / UPM; } labelX.push(x); }
+const LW = labelX[LABEL.length];
+const heroX = []; { let x = 0; for (let i = HERO0; i < LABEL.length; i++) { heroX.push(x); x += gAdv(LABEL[i], 1) * HS / UPM; } heroX.push(x); }
+const HW = heroX[heroX.length - 1], HX0 = (W - HW) / 2, HB = H / 2 + CAPH * HS / UPM / 2;
+/* the settings row */
+const TW = 172, TH = 92, TGAP = 72, ROWW = LW + TGAP + TW, RX0 = (W - ROWW) / 2, LB = 574;
+const TOG = { x: RX0 + LW + TGAP, y: LB - 34 - TH / 2 }, TCX = RX0 + LW + TGAP + TW / 2, TCY = LB - 34;
+const KON = TOG.x + TW - TH / 2, KOFF = TOG.x + TH / 2;                   // the knob's centre, on / off
+/* where the dot lands on the hero i: the centre of its tittle */
+const TIT = (() => { const l = G.hero.i.loops[G.tittle], xs = l.filter((_, j) => j % 2 === 0), ys = l.filter((_, j) => j % 2 === 1), s = HS / UPM;
+  return { x: HX0 + heroX[DOT_I - HERO0] + (Math.min(...xs) + Math.max(...xs)) / 2 * s, y: HB - (Math.min(...ys) + Math.max(...ys)) / 2 * s, r: (Math.max(...xs) - Math.min(...xs)) / 2 * s }; })();
+
+/* ───────────── the graph: the dot moves along the same spring it draws ───────────── */
+const GO = [420, 830], GW = 860, VS = 80, TAU = 1.25;
+const spr = (tau) => 6 * springF(tau, 0.45, 7.04);                         // peaks (≈ 7.2) half a second after it starts, settles on 6
+const gPt = (tau) => [GO[0] + GW * tau / TAU, GO[1] - VS * spr(tau)];
+const GEND = gPt(TAU), C3 = [GEND[0] + 470, GO[1] - VS * 6], CEN = [W / 2, H / 2];
+
+/* ───────────── layers (bottom → top) ───────────── */
+const bg = S('rect', { width: W, height: H, fill: C.LUNAIRE }, svg);
+// 1 · the settings row
+const ui = S('g', {}, svg);
+const uiHead = txt(ui, RX0, 404, 'SETTINGS  ·  CREATIVE STUDIO', type(600, 19, 5.5), C.ARDOISE);
+const uiLine1 = S('line', { x1: RX0 - 64, x2: RX0 + ROWW + 64, y1: 440, y2: 440, stroke: C.BRUME, 'stroke-width': 2 }, ui);
+const uiLine2 = S('line', { x1: RX0 - 64, x2: RX0 + ROWW + 64, y1: 690, y2: 690, stroke: C.BRUME, 'stroke-width': 2 }, ui);
+const uiDesc = txt(ui, RX0, 636, 'Keep every idea inside the frame.', type(500, 29, 0.3), C.ARDOISE);
+const letters = [...LABEL].map((ch) => S('path', { fill: C.COSMOS }, svg)); const letterBlur = mkBlur(60);
+const togG = S('g', {}, svg);
+const track = S('rect', { x: TOG.x, y: TOG.y, width: TW, height: TH, rx: TH / 2, fill: C.BRUME }, togG);
+// 2 · the graph
+const gr = S('g', {}, svg);
+const gGrid = [2, 4, 6].map((v) => S('line', { x1: GO[0], y1: GO[1] - VS * v, y2: GO[1] - VS * v, stroke: v === 6 ? C.ARDOISE : C.BRUME, 'stroke-width': 2, 'stroke-dasharray': v === 6 ? '10 12' : 'none' }, gr));
+const gTick = [2, 4, 6].map((v) => txt(gr, GO[0] - 26, GO[1] - VS * v + 8, String(v), type(600, 22), C.ARDOISE, 'end'));
+const gAxX = S('line', { x1: GO[0], y1: GO[1], y2: GO[1], stroke: C.COSMOS, 'stroke-width': 3 }, gr);
+const gAxY = S('line', { x1: GO[0], x2: GO[0], y1: GO[1], stroke: C.COSMOS, 'stroke-width': 3 }, gr);
+const gLabX = txt(gr, GO[0] + GW + 40, GO[1] + 44, 'TEMPS', type(600, 17, 5), C.ARDOISE, 'end');
+const gLabY = txt(gr, GO[0], GO[1] - VS * 7.9 - 26, 'PÔLES', type(600, 17, 5), C.ARDOISE);
+const gCurve = S('path', { fill: 'none', stroke: C.COSMOS, 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, gr);
+const callG = S('g', {}, gr);
+// the callout sits above the target line, so the dot can later shoot along it
+const callN = txt(callG, GEND[0] + 64, GO[1] - VS * 6 - 26, '6', type(800, 190, -4), C.COSMOS);
+const callL1 = txt(callG, GEND[0] + 196, GO[1] - VS * 6 - 90, 'pôles', type(700, 48, -0.5), C.COSMOS);
+const callL2 = txt(callG, GEND[0] + 196, GO[1] - VS * 6 - 32, "d'expertise", type(500, 48, -0.5), C.COSMOS);
+// 3 · the light and the shape
+const violet = S('circle', { fill: C.HALO }, svg);
+const shape = S('rect', { fill: C.NUIT }, svg);
+// 4 · the six poles on a ring
+const ringG = S('g', {}, svg);
+const POLES = ['BRANDING', 'AUDIOVISUEL', 'PHOTOGRAPHIE', 'DESIGN 2D · 3D', 'MAPPING', 'DIGITAL'], POLE_T = [8.0, 8.5, 9.0, 9.5, 10.0, 10.25];
+const RR = 430, RF = 46, RLS = 5;                                          // the ring: radius, type size, tracking
+// each pole has its own orbit (a path twice round, so a word can cross the seam): it drops onto the ring from outside
+const poles = POLES.map((w, i) => { const path = S('path', { id: 'ringP' + i, fill: 'none' }, defs), t_ = S('text', { fill: C.LUNAIRE, style: type(700, RF, RLS) }, ringG), p = S('textPath', { href: '#ringP' + i }, t_); p.textContent = w; return { t_, p, path }; });
+let ringLaid = null;
+const ring2 = (R) => { const a = `a${R} ${R} 0 1 1 ${2 * R} 0a${R} ${R} 0 1 1 ${-2 * R} 0`; return `M${CEN[0] - R} ${CEN[1]}${a}${a}`; };   // twice round
+// 5 · the halftone field
+const ht = S('g', {}, svg), SPC = 32, htDots = [];
+for (let y = -SPC / 2; y < H + SPC; y += SPC) for (let x = -SPC / 2; x < W + SPC; x += SPC) htDots.push({ el: S('circle', { cx: f1(x), cy: f1(y), r: 0, fill: C.LUNAIRE }, ht), d: Math.hypot(x - CEN[0], y - CEN[1]) });
+// 6 · the end card: the gradient monogram (as on the logo), the Asik wordmark, the line, the signature
+const card = S('g', {}, svg);
+const pairs = (fl) => { const o = []; for (let i = 0; i < fl.length; i += 2) o.push([fl[i], fl[i + 1]]); return o; };
+const ptsD = (pts, map) => 'M' + pts.map((p) => { const q = map(p); return f1(q[0]) + ' ' + f1(q[1]); }).join('L') + 'Z';
+const MS = 500 / MONO.w, MX = (W - 500) / 2, MY = 236, mm = (p) => [MX + p[0] * MS, MY + p[1] * MS];
+const lin = (id, x1, y1, x2, y2) => { const g = S('linearGradient', { id, gradientUnits: 'userSpaceOnUse', x1: f1(x1), y1: f1(y1), x2: f1(x2), y2: f1(y2) }, defs); S('stop', { offset: 0, 'stop-color': '#750BB5' }, g); S('stop', { offset: 1, 'stop-color': '#130F20' }, g); return `url(#${id})`; };
+const GL = lin('gL', MX, MY, MX + 152 * MS, MY + 300 * MS), GA = lin('gA', MX + 152 * MS, MY, MX + 455 * MS, MY + 300 * MS), GR = lin('gR', MX + 640 * MS, MY + 300 * MS, MX + 455 * MS, MY + 150 * MS);
+const MODS = [['At', GL], ['Ab', GL], ['S', GA], ['B', GA], ['C', GA], ['D', GR]];
+const mods = MODS.map(([k, fill]) => { const m = MONO.modules[k]; return { el: S('path', { d: ptsD(pairs(m.loop), mm), fill, stroke: fill, 'stroke-width': 1, 'stroke-linejoin': 'round' }, card), c: mm(m.c) }; });
+const WMS = 0.86, WMX = (W - 766 * WMS) / 2 - 167 * WMS, WMB = 600, wmMap = (p) => [WMX + p[0] * WMS, WMB - (679 - p[1]) * WMS];
+const wClip = S('clipPath', { id: 'wClip' }, svg); S('rect', { x: 0, y: 0, width: W, height: WMB + 1 }, wClip);
+const wmG = S('g', { 'clip-path': 'url(#wClip)' }, card);
+const wm = WM.letters.map((L) => S('path', { d: L.loops.map((l) => ptsD(pairs(l), wmMap)).join(''), fill: C.COSMOS }, wmG));
+const sClip = S('clipPath', { id: 'sClip' }, svg); const sClipR = S('rect', { y: 630, height: 50 }, sClip);
+const studio = txt(card, W / 2, 664, 'STUDIO DE PRODUCTION VISUELLE', type(600, 21, 8.8), C.ARDOISE, 'middle'); studio.setAttribute('clip-path', 'url(#sClip)');
+const gClip = S('clipPath', { id: 'gClip' }, svg); const gClipR = S('rect', { x: 0, y: 700, height: 70 }, gClip);
+const sign = txt(card, 0, 752, 'Des visions créatives. Des univers singuliers', type(400, 34, -0.2), C.COSMOS); sign.setAttribute('clip-path', 'url(#gClip)');
+let PERIOD = null, SIGN_X0 = 0;
+// the cursor, the toggle's knob, the dot
+const cursor = S('path', { d: 'M0 0L0 50L12 38L21 59L30 55L21 34L38 34Z', fill: C.COSMOS, stroke: C.BLANC, 'stroke-width': 3, 'stroke-linejoin': 'round' }, svg);
+const dot = S('rect', { fill: C.ECLIPSE }, svg); const dotBlur = mkBlur(80);
+const knob = S('circle', { r: TH / 2 - 7, fill: C.BLANC }, svg);
+svg.appendChild(cursor);                                                   // the cursor above everything
+
+/* ───────────── the dot: one continuous path through the film ───────────── */
+const arc = (a, b, p, h) => [lerp(a[0], b[0], p), lerp(a[1], b[1], p) - h * Math.sin(Math.PI * p)];
+function dotAt(t) {                                            // → { x, y, w, h } (a rounded rect: a pill, or a circle when w = h)
+  const c = (x, y, r) => ({ x, y, w: 2 * r, h: 2 * r });
+  if (t < 1.0) return { x: TCX, y: TCY, w: TW, h: TH };                                                // the toggle's orange track (on)
+  if (t < 1.25) { const q = bounce(t, 1.0, 0.25, 0.7, 22); return { x: lerp(TCX, KON, q), y: TCY, w: lerp(TW, 32, q), h: lerp(TH, 32, q) }; }   // switched off: the orange drains into a dot
+  if (t < 2.0) return c(KON, TCY, 16);
+  if (t < 2.36) { const p = eo(P(t, 2.0, 0.36), 2.5), q = arc([KON, TCY], [TIT.x, TIT.y], p, 300); return c(q[0], q[1], lerp(16, TIT.r + 2, p)); }   // onto the i
+  if (t < 3.0) { const s = bounce(t, 2.36, 0.4, 0.45, 26) - 1; return { x: TIT.x, y: TIT.y, w: 2 * (TIT.r + 2) * (1 - 0.25 * s), h: 2 * (TIT.r + 2) * (1 + 0.25 * s) }; }  // a little squash on landing
+  if (t < 3.5) { const p = eo(P(t, 3.0, 0.5), 2.2), q = arc([TIT.x, TIT.y], GO, p, 360); return c(q[0], q[1], lerp(TIT.r + 2, 15, p)); }
+  if (t < 3.5 + TAU) { const q = gPt(t - 3.5); return c(q[0], q[1], 15); }                         // it draws the spring
+  if (t < 5.5) return c(GEND[0], GEND[1], 15);
+  if (t < 6.5) { const p = eo(P(t, 5.5, 0.4), 4); return c(lerp(GEND[0], C3[0], p), lerp(GEND[1], C3[1], p), 15); }   // it shoots along the target line
+  if (t < 7.5) { const q = bounce(t, 6.5, 0.5, 0.6, 14); return c(lerp(C3[0], CEN[0], q), lerp(C3[1], CEN[1], q), 15); }  // it rides the square to the centre
+  if (t < 11.5) { const kick = POLE_T.reduce((a, t0) => a + (t >= t0 ? Math.exp(-(t - t0) * 9) : 0), 0); return c(CEN[0], CEN[1], 26 + 6 * kick - 11 * (1 - bounce(t, 7.5, 0.5))); }
+  if (!PERIOD) return c(CEN[0], CEN[1], 26);
+  if (t < 13.5) { const p = eo(P(t, 11.5, 0.42), 3), q = arc(CEN, PERIOD, p, 120); return c(q[0], q[1], lerp(26, PERIOD[2], p)); }   // it becomes the full stop
+  // the return: through the halftone, the graph, back into the toggle
+  if (t < 13.85) { const p = eo(P(t, 13.5, 0.35), 2.5), q = arc(PERIOD, CEN, p, 160); return c(q[0], q[1], lerp(PERIOD[2], 18, p)); }
+  if (t < 14.25) { const q = gPt(TAU * (1 - ei(P(t, 13.85, 0.4), 2))); return c(q[0], q[1], 15); }
+  if (t < 14.5) { const p = eo(P(t, 14.25, 0.25), 2.5), q = arc(GO, [KON, TCY], p, 260); return c(q[0], q[1], lerp(15, 16, p)); }
+  { const q = bounce(t, 14.5, 0.4, 0.7, 20); return { x: lerp(KON, TCX, q), y: TCY, w: lerp(32, TW, q), h: lerp(32, TH, q) }; }   // it fills the track again (on)
+}
+const knobAt = (t) => (t < 1.0 ? KON : t < 14.5 ? lerp(KON, KOFF, bounce(t, 1.0, 0.35, 0.55, 18)) : lerp(KOFF, KON, bounce(t, 14.55, 0.4, 0.6, 18)));
+const cursorAt = (t) => {
+  const home = [1480, 870], onTog = [TCX + 18, TCY + 14];
+  if (t < 1.0) { const q = bounce(t, 0.15, 0.85, 0.75, 9); return [lerp(home[0], onTog[0], q), lerp(home[1], onTog[1], q), t > 0.92 ? 0.86 : 1]; }
+  if (t < 1.1) return [onTog[0], onTog[1], 0.86 + 0.14 * P(t, 1.0, 0.1)];
+  if (t < 14.2) { const q = ei(P(t, 1.25, 0.55), 3); return [lerp(onTog[0], 2080, q), lerp(onTog[1], 1240, q), 1]; }
+  const q = eo(P(t, 14.3, 0.62), 4); return [lerp(2080, home[0], q), lerp(1240, home[1], q), 1];
+};
+
+/* ───────────── the clock ───────────── */
+function seek(t) {
+  t = clamp(t, 0, DUR);
+  if (!PERIOD) { const w = sign.getComputedTextLength(); SIGN_X0 = W / 2 - (w + 14) / 2; sign.setAttribute('x', f1(SIGN_X0)); PERIOD = [SIGN_X0 + w + 9, 752 - 4.5, 4.5]; }
+  if (!ringLaid) {
+    const R = RR, Lc = 2 * Math.PI * R; poles.forEach(({ path }) => path.setAttribute('d', ring2(R))); const ls = poles.map(({ t_ }) => t_.getComputedTextLength());
+    const gap = (Lc - ls.reduce((a, b) => a + b, 0)) / POLES.length; let o = 0; ringLaid = ls.map((l) => { const s = o / Lc; o += l + gap; return s; });
+  }
+  // the ground
+  const dark = (t >= 7.5 && t < 11.5) || (t >= 13.5 && t < 13.85);
+  bg.setAttribute('fill', dark ? C.NUIT : C.LUNAIRE);
+
+  // 1 · the settings row → « Imagination »
+  const uiOn = t < 3.5 || t >= 14.25; vis(ui, uiOn && (t < 1.9 || t >= 14.25)); vis(togG, t < 2.0 || t >= 14.25);
+  const fall = (t0, i) => { const p = ei(P(t, t0, 0.42), 3); return { y: 980 * p, r: (i % 2 ? 1 : -1) * 38 * p }; };
+  if (t < 1.9 || t >= 14.25) {
+    const back = t >= 14.25;
+    [[uiHead, 0], [uiLine1, 1], [uiDesc, 2], [uiLine2, 3]].forEach(([e, i]) => { const f = back ? { y: 0, r: 0 } : fall(1.5 + 0.04 * i, i); tf(e, `translate(0 ${f1(f.y)}) rotate(${f2(f.r)} ${W / 2} 540)`); });
+  }
+  if (t < 2.0 || t >= 14.25) { const f = t >= 14.25 ? { y: 0, r: 0 } : fall(1.62, 1); tf(togG, `translate(0 ${f1(f.y)}) rotate(${f2(f.r)} ${TCX} ${TCY})`); tf(knob, `translate(0 ${f1(f.y)})`); }
+  vis(knob, t < 2.0 || t >= 14.25); knob.setAttribute('cx', f1(knobAt(t))); knob.setAttribute('cy', TCY);
+  const lettersOn = t < 3.5 || t >= 14.25;
+  letters.forEach((el, i) => {
+    vis(el, lettersOn && LABEL[i] !== ' '); if (!lettersOn || LABEL[i] === ' ') return;
+    const back = t >= 14.25, hero = i >= HERO0;
+    let x = RX0 + labelX[i], y = LB, size = LS, k = 0, rot = 0;
+    if (!back && !hero) { const f = fall(1.5 + 0.03 * i, i); y += f.y; rot = f.r; x += (i - 2.5) * 30 * P(t, 1.5, 0.42); }
+    if (!back && hero) {
+      const q = bounce(t, 1.55 + 0.025 * (i - HERO0), 0.6, 0.62, 12);                                     // the letters bend and move into place
+      x = lerp(x, HX0 + heroX[i - HERO0], q); y = lerp(y, HB, q); size = lerp(LS, HS, q); k = clamp(q); rot = 16 * Math.sin(Math.PI * clamp(q)) * (i % 2 ? 1 : -1);
+      if (t >= 3.0) { const f = fall(3.0 + 0.022 * (i - HERO0), i); y += f.y; rot += f.r; }               // and let go when the dot leaves
+    }
+    const cx = gAdv(LABEL[i], k) * size / UPM / 2;
+    el.setAttribute('d', gD(LABEL[i], k, size, hero && i === DOT_I && t >= 2.3 && t < 14.25));
+    tf(el, `translate(${f1(x)} ${f1(y)}) rotate(${f2(rot)} ${f1(cx)} ${f1(-CAPH * size / UPM / 2)})`);
+  });
+
+  // 2 · the graph (and its flash on the way back)
+  const grOn = (t >= 3.0 && t < 6.5) || (t >= 13.85 && t < 14.25); vis(gr, grOn);
+  if (grOn) {
+    const back = t >= 13.85, a = back ? 1 : eo(P(t, 3.05, 0.4), 4);
+    gAxX.setAttribute('x2', f1(GO[0] + (GW + 60) * a)); gAxY.setAttribute('y2', f1(GO[1] - VS * 8 * a));
+    gGrid.forEach((e, i) => e.setAttribute('x2', f1(GO[0] + (i === 2 ? GW + 520 : GW + 60) * (back ? 1 : eo(P(t, 3.15 + 0.05 * i, 0.4), 4)))));
+    [...gTick, gLabX, gLabY].forEach((e) => vis(e, back || t >= 3.3));
+    const tau = back ? TAU * (1 - ei(P(t, 13.85, 0.4), 2)) : clamp(t - 3.5, 0, TAU); let d = '';
+    for (let i = 0; i <= 120; i++) { const q = gPt(tau * i / 120); d += (i ? 'L' : 'M') + f1(q[0]) + ' ' + f1(q[1]); }
+    gCurve.setAttribute('d', tau > 0.001 ? d : '');
+    const cq = bounce(t, 4.5, 0.5, 0.6, 14), callOn = !back && t >= 4.5; vis(callG, callOn);
+    if (callOn) { tf(callG, `translate(${f1(-40 * (1 - cq))} 0)`); callN.textContent = String(Math.min(6, Math.floor(6 * P(t, 4.5, 0.32)) + 1)); }
+  }
+
+  // 3 · the light, the square, the pill
+  const vq = P(t, 6.0, 0.42), vOn = t >= 6.0 && t < 7.5; vis(violet, vOn);
+  if (vOn) { violet.setAttribute('cx', f1(C3[0])); violet.setAttribute('cy', f1(C3[1])); violet.setAttribute('r', f1(15 + 2400 * eo(vq, 4))); }
+  const shOn = t >= 6.5 && t < 7.5; vis(shape, shOn);
+  if (shOn) {
+    const q1 = bounce(t, 6.5, 0.5, 0.55, 14), q2 = bounce(t, 7.0, 0.32, 0.6, 18), q3 = ei(P(t, 7.25, 0.25), 3);
+    const cx = lerp(C3[0], CEN[0], q1), cy = lerp(C3[1], CEN[1], q1);
+    let w = 360 * q1, h = 360 * q1; w = lerp(w, 1000, q2); h = lerp(h, 220, q2); w = lerp(w, 2700, q3); h = lerp(h, 1700, q3);
+    const rx = lerp(0.24 * Math.min(w, h), Math.min(w, h) / 2, q2), rot = lerp(135 * q1, 180, q2);
+    ['x', 'y', 'width', 'height'].forEach((a, i) => shape.setAttribute(a, f1([cx - w / 2, cy - h / 2, w, h][i])));
+    shape.setAttribute('rx', f1(rx)); tf(shape, `rotate(${f2(rot)} ${f1(cx)} ${f1(cy)})`);
+  }
+
+  // 4 · the six poles orbit the dot, then open out
+  const rOn = t >= 7.9 && t < 11.0; vis(ringG, rOn);
+  if (rOn) {
+    const open = 1300 * ei(P(t, 10.5, 0.5), 3);
+    const spin = 0.05 * (t - 7.5) + 0.04 * POLE_T.reduce((a, t0) => a + bounce(t, t0, 0.45, 0.55, 14), 0);
+    poles.forEach(({ t_, p }, i) => {
+      const t0 = POLE_T[i], on = t >= t0; vis(t_, on); if (!on) return;
+      const q = bounce(t, t0, 0.45, 0.55, 14), R = RR + 220 * (1 - q) + open, off = ringLaid[i] + spin;
+      poles[i].path.setAttribute('d', ring2(R));
+      p.setAttribute('startOffset', f2(50 * (((off % 1) + 1) % 1)) + '%');
+      t_.setAttribute('style', type(700, RF, f1(lerp(9, RLS, clamp(q)))));
+    });
+  }
+
+  // 5 · the halftone: it follows the opening ring, grows past the edges into the cream of the end card (and back)
+  const htOn = (t >= 10.5 && t < 11.5) || (t >= 13.5 && t < 13.85); vis(ht, htOn);
+  if (htOn) {
+    const back = t >= 13.5, ringR = back ? 3000 : RR + 1300 * ei(P(t, 10.5, 0.5), 3);   // the dots appear where the ring has passed
+    const base = back ? lerp(70, 0, eo(P(t, 13.5, 0.33), 3)) : lerp(3, 70, ei(P(t, 10.62, 0.86), 2.4));
+    for (const D of htDots) D.el.setAttribute('r', D.d < ringR - 24 ? f2(base * (0.35 + 0.65 * Math.exp(-D.d / 420))) : 0);
+  }
+
+  // 6 · the end card
+  const cOn = t >= 11.5 && t < 13.85; vis(card, cOn);
+  if (cOn) {
+    const cf = ei(P(t, 13.5, 0.32), 3); tf(card, `translate(0 ${f1(1000 * cf)})`);                      // on the way back it falls with the cream
+    mods.forEach((m, i) => { const q = bounce(t, 11.5 + 0.045 * i, 0.5, 0.55, 14); tf(m.el, `translate(${f1(m.c[0])} ${f1(m.c[1])}) scale(${f3(Math.max(0.001, q))}) translate(${f1(-m.c[0])} ${f1(-m.c[1])})`); });
+    wm.forEach((e, i) => tf(e, `translate(0 ${f1(80 * (1 - bounce(t, 12.0 + 0.035 * i, 0.5, 0.6, 14)))})`));
+    const sq = eo(P(t, 12.5, 0.45), 4), half = 330 * sq + 1; sClipR.setAttribute('x', f1(W / 2 - half)); sClipR.setAttribute('width', f1(2 * half)); vis(studio, sq > 0);
+    const gq = eo(P(t, 13.0, 0.42), 3.5); gClipR.setAttribute('x', f1(SIGN_X0 - 4)); gClipR.setAttribute('width', f1((PERIOD[0] - SIGN_X0) * gq + 4)); vis(sign, gq > 0);
+  }
+
+  // the cursor, the dot
+  const cu = cursorAt(t); tf(cursor, `translate(${f1(cu[0])} ${f1(cu[1])}) scale(${f3(1.35 * cu[2])})`); vis(cursor, cu[0] < W + 40 && cu[1] < H + 40);
+  const d = dotAt(t), r = Math.min(d.w, d.h) / 2;
+  dot.setAttribute('x', f1(d.x - d.w / 2)); dot.setAttribute('y', f1(d.y - d.h / 2)); dot.setAttribute('width', f2(d.w)); dot.setAttribute('height', f2(d.h)); dot.setAttribute('rx', f2(r)); dot.setAttribute('ry', f2(r));
+  const v = vel((tt) => { const q = dotAt(tt); return [q.x, q.y]; }, t); setBlur(dotBlur, dot, v[0], v[1]);
+  return true;
+}
+window.seek = seek;
+window.__ready = document.fonts.load("600 30px Montserrat").then(() => document.fonts.ready).then(() => { seek(0); return true; });
+__AUDIO__
+})();
+</script>
+</body>
+</html>
