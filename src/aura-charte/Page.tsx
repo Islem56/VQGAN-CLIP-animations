@@ -1,0 +1,69 @@
+// The guidelines page frame: header, eyebrow, title, body, the FORME · VOLUME · ESPACE triad and the footer
+// (moon phase, the orange dot, the page number). It cross-fades whenever the page changes.
+import React from "react";
+import { C, clamp, prog, TL } from "./lib";
+import { Format, LAYOUT, PAGE_CHANGES, PageMeta, pageIndexAt } from "./layout";
+import { measure, typeStyle } from "../shared/motion";
+
+const ink = (dark: boolean) => ({ muted: dark ? C.BRUME : C.ARDOISE, mutedOpacity: dark ? 0.7 : 1, title: dark ? C.LUNAIRE : C.COSMOS, eyebrow: dark ? C.BRUME : C.HALO });
+
+export const Moon: React.FC<{ cx: number; cy: number; r: number; f: number; color: string }> = ({ cx, cy, r, f, color }) => {
+  const rx = Math.abs(1 - 2 * f) * r;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={1.4} opacity={0.7} />
+      {f >= 0.999 ? <circle cx={cx} cy={cy} r={r} fill={color} />
+        : <path d={`M${cx} ${cy - r}A${r} ${r} 0 0 1 ${cx} ${cy + r}A${rx} ${r} 0 0 ${f > 0.5 ? 1 : 0} ${cx} ${cy - r}Z`} fill={color} />}
+    </g>
+  );
+};
+
+const Frame: React.FC<{ format: Format; p: PageMeta; t: number }> = ({ format, p, t }) => {
+  const L = LAYOUT[format], k = ink(p.dark), hs = L.headerSize, track = hs * 0.2;
+  const lift = 12 * (1 - prog(t, 0.1, 0.6));
+  const numW = measure(p.pageNo, 600, hs, track);
+  return (
+    <g>
+      <text x={L.margin} y={L.headerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>AURA LUNA — BRAND GUIDELINES</text>
+      <text x={L.W - L.margin} y={L.sectionY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.section}</text>
+      <g transform={`translate(0 ${lift.toFixed(2)})`}>
+        {p.eyebrow && <text x={L.margin} y={L.eyebrowY} fill={k.eyebrow} style={typeStyle(600, L.eyebrowSize, L.eyebrowSize * 0.26)}>{p.eyebrow}</text>}
+        {p.title?.map((line, i) => <text key={i} x={L.margin} y={L.titleY + i * L.titleLeading} fill={k.title} style={typeStyle(400, L.titleSize, -L.titleSize * 0.01)}>{line}</text>)}
+        {p.body?.map((line, i) => <text key={i} x={L.margin} y={L.bodyY + i * L.bodySize * 1.5} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(400, L.bodySize)}>{line}</text>)}
+      </g>
+      <Moon cx={L.margin + hs * 0.5} cy={L.footerY - hs * 0.36} r={hs * 0.5} f={p.phaseFraction} color={k.title} />
+      <text x={L.margin + hs * 1.6} y={L.footerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.phase}</text>
+      <circle cx={L.W - L.margin - numW - hs * 0.55} cy={L.footerY - hs * 0.36} r={hs * 0.22} fill={C.ECLIPSE} />
+      <text x={L.W - L.margin} y={L.footerY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.pageNo}</text>
+    </g>
+  );
+};
+
+/** FORME · VOLUME · ESPACE under the chapter title, the active word lit */
+export const Triad: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
+  const L = LAYOUT[format], o = prog(t, TL.point, 0.3) * (1 - prog(t, TL.align - 0.3, 0.3));
+  if (o <= 0) return null;
+  const active = t >= TL.space ? "ESPACE" : t >= TL.volume ? "VOLUME" : "FORME", k = ink(true);
+  return (
+    <text x={L.margin} y={L.triadY} opacity={o} style={typeStyle(600, L.eyebrowSize, L.eyebrowSize * 0.26)}>
+      {["FORME", "VOLUME", "ESPACE"].map((w, i) => (
+        <tspan key={w} fill={w === active ? k.title : k.muted} opacity={w === active ? 1 : 0.5}>{(i ? "  ·  " : "") + w}</tspan>
+      ))}
+    </text>
+  );
+};
+
+/** the page frame at time t, cross-fading for 0.3 s after each change */
+export const Page: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
+  const L = LAYOUT[format], i = pageIndexAt(t), [t0, cur] = PAGE_CHANGES[i];
+  const p = i === 0 ? 1 : clamp((t - t0) / 0.3), prev = i > 0 ? PAGE_CHANGES[i - 1][1] : null, enter = prog(t, 0, 0.4);
+  return (
+    <svg width={L.W} height={L.H} viewBox={`0 0 ${L.W} ${L.H}`} style={{ position: "absolute", inset: 0 }}>
+      <g opacity={enter}>
+        {prev && prev.frame && p < 1 && <g opacity={1 - p}><Frame format={format} p={prev} t={t} /></g>}
+        {cur.frame && <g opacity={p}><Frame format={format} p={cur} t={t} /></g>}
+      </g>
+      <Triad format={format} t={t} />
+    </svg>
+  );
+};

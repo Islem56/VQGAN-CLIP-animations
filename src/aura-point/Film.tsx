@@ -2,32 +2,13 @@
 // toggle, the i of « Imagination », a spring graph (6 pôles d'expertise), the violet light, a square → pill → night,
 // the six poles in orbit, a halftone field, the end card (it is the full stop), and back into the toggle (loops).
 // Every value is a pure function of the frame; every beat comes from timeline.json.
-import React, { useEffect, useMemo, useState } from "react";
-import { AbsoluteFill, continueRender, delayRender, Freeze, staticFile, useCurrentFrame } from "remotion";
+import React, { useMemo } from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { Grain, measure, MotionBlur, typeStyle, useFont } from "../shared/motion";
 import G from "./data/glyphs.json";
 import MONO from "./data/monogram.json";
 import WM from "./data/wordmark.json";
-import { C, clamp, ease, expIn, FPS, FRAMES, LAYOUT, Layout, lerp, lin, prog, rand, sp, SPRING, springF, TL } from "./lib";
-
-/* ───────── the typeface: Montserrat (variable), loaded before the first frame ───────── */
-const FONT = "AuraMontserrat";
-let fontPromise: Promise<unknown> | null = null;
-const loadFont = () => (fontPromise ??= new FontFace(FONT, `url(${staticFile("aura-point/montserrat-variable.woff2")}) format("woff2")`, { weight: "100 900" })
-  .load().then((f) => { document.fonts.add(f); }).catch((e) => console.error(e)));
-/** true once Montserrat is in: every width is measured with the real font, never a fallback */
-const useFont = () => {
-  const [ready, setReady] = useState(false), [wait] = useState(() => delayRender("Montserrat"));
-  useEffect(() => { loadFont().then(() => setReady(true)); }, []);
-  useEffect(() => { if (ready) continueRender(wait); }, [ready, wait]);
-  return ready;
-};
-const typeStyle = (w: number, size: number, ls = 0): React.CSSProperties => ({ fontFamily: FONT, fontWeight: w, fontVariationSettings: `'wght' ${w}`, fontSize: size, letterSpacing: ls });
-let measureCtx: CanvasRenderingContext2D | null = null;
-const measure = (s: string, w: number, size: number, ls = 0) => {
-  if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
-  measureCtx!.font = `${w} ${size}px ${FONT}`;
-  return measureCtx!.measureText(s).width + ls * s.length;
-};
+import { C, clamp, ease, expIn, FPS, FRAMES, LAYOUT, Layout, lerp, lin, prog, sp, SPRING, springF, TL } from "./lib";
 
 /* ───────── shapes ───────── */
 type Pt = [number, number];
@@ -281,37 +262,6 @@ const Frame: React.FC<{ L: Layout }> = ({ L }) => {
   );
 };
 
-/* film grain, reseeded on twos (subliminal: nothing in the frame is ever dead-still).
-   It sits above the motion blur, which would otherwise average it away. */
-const Grain: React.FC<{ W: number; H: number }> = ({ W, H }) => {
-  const seed = Math.floor(useCurrentFrame() / 2);
-  return (
-    <svg width={W} height={H} style={{ position: "absolute", inset: 0, mixBlendMode: "overlay", opacity: 0.1, pointerEvents: "none" }}>
-      <filter id="grain" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency={0.85} numOctaves={2} seed={Math.round(rand(seed) * 1000)} stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" />
-      </filter>
-      <rect width={W} height={H} filter="url(#grain)" />
-    </svg>
-  );
-};
-
-/* true motion blur: 6 sub-frames over half a frame (180° shutter). Each layer is laid over the previous ones at
-   1/(k+1) opacity, so all six weigh the same and a still frame stays exactly on palette (an additive blend
-   brightened the canvas by ~5 levels and made frame 0, which has no past, flash at the loop point). */
-const SAMPLES = 6, SHUTTER = 0.5;
-const MotionBlur: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const frame = useCurrentFrame();
-  return (
-    <AbsoluteFill>
-      {Array.from({ length: SAMPLES }, (_, k) => (
-        <AbsoluteFill key={k} style={{ opacity: 1 / (k + 1) }}>
-          <Freeze frame={frame - (SHUTTER * (SAMPLES - 1 - k)) / SAMPLES}>{children}</Freeze>
-        </AbsoluteFill>
-      ))}
-    </AbsoluteFill>
-  );
-};
 export const AuraPoint: React.FC<{ format: "h" | "v" }> = ({ format }) => (
   <AbsoluteFill>
     <MotionBlur><Scene L={LAYOUT[format]} /></MotionBlur>
