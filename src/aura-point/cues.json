@@ -1,143 +1,143 @@
 [
  {
-  "t": 1,
+  "t": 0.992,
   "type": "click",
   "desc": "the cursor turns the toggle off"
  },
  {
-  "t": 1.5,
+  "t": 1.488,
   "type": "movement",
   "desc": "« Limit » and the settings row fall away"
  },
  {
-  "t": 2,
+  "t": 1.984,
   "type": "movement",
   "desc": "the dot jumps off the toggle"
  },
  {
-  "t": 2.36,
+  "t": 2.341,
   "type": "appear",
   "desc": "the dot lands as the i's tittle"
  },
  {
-  "t": 3,
+  "t": 2.975,
   "type": "movement",
   "desc": "the dot leaves, « Imagination » falls"
  },
  {
-  "t": 4,
+  "t": 3.967,
   "type": "success",
   "desc": "the spring peaks"
  },
  {
-  "t": 4.5,
+  "t": 4.463,
   "type": "hover_or_small_ui",
   "desc": "6 pôles d'expertise counts in"
  },
  {
-  "t": 5.5,
+  "t": 5.455,
   "type": "movement",
   "desc": "the dot shoots along the target line"
  },
  {
-  "t": 5.6,
+  "t": 5.555,
   "type": "build_up",
   "desc": "riser into the violet light",
-  "dur": 0.4
+  "dur": 0.3958999999999998
  },
  {
-  "t": 6,
+  "t": 5.95,
   "type": "scene_cut",
   "desc": "violet light fills the frame"
  },
  {
-  "t": 6.5,
+  "t": 6.446,
   "type": "appear",
   "desc": "the Nuit square springs open (hero spring)"
  },
  {
-  "t": 7,
+  "t": 6.942,
   "type": "movement",
   "desc": "square stretches into a pill"
  },
  {
-  "t": 7.25,
+  "t": 7.438,
   "type": "scene_cut",
-  "desc": "the pill becomes the night"
+  "desc": "the night fills the frame (the pill's last rush)"
  },
  {
-  "t": 8,
+  "t": 7.934,
   "type": "hover_or_small_ui",
   "desc": "pole 1 drops into orbit"
  },
  {
-  "t": 8.5,
+  "t": 8.43,
   "type": "hover_or_small_ui",
   "desc": "pole 2 drops into orbit"
  },
  {
-  "t": 9,
+  "t": 8.926,
   "type": "hover_or_small_ui",
   "desc": "pole 3 drops into orbit"
  },
  {
-  "t": 9.5,
+  "t": 9.422,
   "type": "hover_or_small_ui",
   "desc": "pole 4 drops into orbit"
  },
  {
-  "t": 10,
+  "t": 9.917,
   "type": "hover_or_small_ui",
   "desc": "pole 5 drops into orbit"
  },
  {
-  "t": 10.25,
+  "t": 10.165,
   "type": "hover_or_small_ui",
   "desc": "pole 6 drops into orbit"
  },
  {
-  "t": 10.52,
+  "t": 10.433,
   "type": "build_up",
   "desc": "the ring opens into the halftone",
-  "dur": 0.98
+  "dur": 0.9717999999999996
  },
  {
-  "t": 11.5,
+  "t": 11.405,
   "type": "reveal",
   "desc": "the end card: monogram (the loudest hit)"
  },
  {
-  "t": 12,
+  "t": 11.901,
   "type": "appear",
   "desc": "AURA LUNA rises"
  },
  {
-  "t": 12.5,
+  "t": 12.397,
   "type": "hover_or_small_ui",
   "desc": "Studio de production visuelle"
  },
  {
-  "t": 13.5,
+  "t": 13.393,
   "type": "success",
   "desc": "the signature lands on its full stop"
  },
  {
-  "t": 15.5,
+  "t": 15.372,
   "type": "scene_cut",
   "desc": "the card falls away"
  },
  {
-  "t": 15.85,
+  "t": 15.719,
   "type": "movement",
   "desc": "back along the graph"
  },
  {
-  "t": 16.25,
+  "t": 16.116,
   "type": "movement",
   "desc": "back into the toggle"
  },
  {
-  "t": 16.5,
+  "t": 16.364,
   "type": "click",
   "desc": "the toggle turns on: the loop closes"
  }

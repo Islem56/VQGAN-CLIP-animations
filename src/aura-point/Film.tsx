@@ -7,7 +7,7 @@ import { AbsoluteFill, continueRender, delayRender, Freeze, staticFile, useCurre
 import G from "./data/glyphs.json";
 import MONO from "./data/monogram.json";
 import WM from "./data/wordmark.json";
-import { C, clamp, DURATION, ease, expIn, FPS, LAYOUT, Layout, lerp, lin, prog, rand, sp, SPRING, springF, TL } from "./lib";
+import { C, clamp, ease, expIn, FPS, FRAMES, LAYOUT, Layout, lerp, lin, prog, rand, sp, SPRING, springF, TL } from "./lib";
 
 /* ───────── the typeface: Montserrat (variable), loaded before the first frame ───────── */
 const FONT = "AuraMontserrat";
@@ -119,7 +119,7 @@ const Scene: React.FC<{ L: Layout }> = ({ L }) => {
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.LUNAIRE }} />;
   return <Frame L={L} />;
 };
-const N = DURATION * FPS;
+const N = FRAMES;
 const Frame: React.FC<{ L: Layout }> = ({ L }) => {
   const frame = ((useCurrentFrame() % N) + N) % N, t = frame / FPS;          // wraps: the blur of frame 0 is the end of the loop
   const g = useMemo(() => geometry(L), [L]);

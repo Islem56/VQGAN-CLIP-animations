@@ -5,6 +5,7 @@ import TL from "./timeline.json";
 export { TL };
 export const FPS = TL.fps;
 export const DURATION = TL.duration;
+export const FRAMES = Math.round(TL.duration * TL.fps);
 
 /* The brand palette (guidelines, 04 · Couleurs). Éclipse is only ever the dot. */
 export const C = {

@@ -1,12 +1,23 @@
 {
   "fps": 60,
-  "bpm": 120,
-  "duration": 17,
-  "s1": { "cursorIn": 0.15, "click": 1.0, "letGo": 1.5, "heroIn": 1.6, "jump": 2.0, "land": 2.36 },
-  "s2": { "leave": 3.0, "axes": 3.05, "draw": 3.5, "peak": 4.0, "callout": 4.5, "settle": 4.75 },
-  "s3": { "shoot": 5.5, "light": 6.0, "square": 6.5, "pill": 7.0, "night": 7.25, "dot": 7.5 },
-  "s4": { "poles": [8.0, 8.5, 9.0, 9.5, 10.0, 10.25], "open": 10.5 },
-  "s5": { "halftone": 10.62, "cream": 11.5 },
-  "s6": { "card": 11.5, "wordmark": 12.0, "studio": 12.5, "sign": 13.0, "out": 15.5 },
-  "s7": { "graph": 15.85, "toggle": 16.25, "refill": 16.5 }
+  "bpm": 121,
+  "_note": "retimed from the 120 BPM cut to 121 BPM so the cuts land on the beats of \"Hazy After Hours\" (Mixkit #132)",
+  "duration": 16.86667,
+  "s1": {
+    "cursorIn": 0.1488,
+    "click": 0.9917,
+    "letGo": 1.4876,
+    "heroIn": 1.5868,
+    "jump": 1.9835,
+    "land": 2.3405
+  },
+  "s2": { "leave": 2.9752, "axes": 3.0248, "draw": 3.4711, "peak": 3.9669, "callout": 4.4628, "settle": 4.7107 },
+  "s3": { "shoot": 5.4545, "light": 5.9504, "square": 6.4463, "pill": 6.9421, "night": 7.1901, "dot": 7.438 },
+  "s4": {
+    "poles": [7.9339, 8.4298, 8.9256, 9.4215, 9.9174, 10.1653],
+    "open": 10.4132
+  },
+  "s5": { "halftone": 10.5322, "cream": 11.405 },
+  "s6": { "card": 11.405, "wordmark": 11.9008, "studio": 12.3967, "sign": 12.8926, "out": 15.3719 },
+  "s7": { "graph": 15.719, "toggle": 16.1157, "refill": 16.3636 }
 }

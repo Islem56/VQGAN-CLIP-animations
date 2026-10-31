@@ -1,6 +1,7 @@
 # AURA LUNA — « Le point » (Remotion)
 
-17 s · 60 fps · 120 BPM · loops (the last frame leads into the first). The Remotion rebuild of
+16.9 s · 60 fps · 121 BPM · loops (the last frame leads into the first). Cut to the beat of
+« Hazy After Hours » (Alejandro Magaña, Mixkit #132; downloaded at runtime, never committed). The Remotion rebuild of
 `auraluna-point/`: one written motion language, review sheets at every beat, true motion blur and a
 measured sound pass.
 

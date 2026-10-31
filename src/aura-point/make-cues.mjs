@@ -17,7 +17,7 @@ const cues = [
   c(s3.light, "scene_cut", "violet light fills the frame"),
   c(s3.square, "appear", "the Nuit square springs open (hero spring)"),
   c(s3.pill, "movement", "square stretches into a pill"),
-  c(s3.night, "scene_cut", "the pill becomes the night"),
+  c(s3.dot, "scene_cut", "the night fills the frame (the pill's last rush)"),
   ...s4.poles.map((t, i) => c(t, "hover_or_small_ui", `pole ${i + 1} drops into orbit`)),
   c(s4.open + 0.02, "build_up", "the ring opens into the halftone", { dur: s5.cream - s4.open - 0.02 }),
   c(s6.card, "reveal", "the end card: monogram (the loudest hit)"),
