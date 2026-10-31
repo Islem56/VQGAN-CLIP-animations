@@ -88,14 +88,6 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
   }), []);
   const glass = glassMaterial(t);
 
-  // the construction grid draws on from the centre in 0.5 s
-  const grid = useMemo(() => new BufferGeometry(), []);
-  const gridOn = 1 - ease.inOut(lin(t, TL.volume, 0.8));   // gone before the orbit: 1-px lines shimmer when the camera moves
-  const g = prog(t, 0, 0.5), step = 0.8, [ox, oy] = ADN[format].a, half = format === "v" ? [7, 11] : [14, 8], pts: number[] = [];
-  for (let x = -half[0]; x <= half[0] + 1e-6; x += step) pts.push(ox + x, oy - half[1] * g, -0.6, ox + x, oy + half[1] * g, -0.6);
-  for (let y = -half[1]; y <= half[1] + 1e-6; y += step) pts.push(ox - half[0] * g, oy + y, -0.6, ox + half[0] * g, oy + y, -0.6);
-  grid.setAttribute("position", new BufferAttribute(new Float32Array(pts), 3));
-
   // the point: from the page number, an arc into the page, then it draws the beam
   const p = pageAt(TL.point - 0.01), hs = L.headerSize;
   const dotPx: [number, number] = [L.W - L.margin - measure(p.pageNo, 600, hs, hs * 0.2) - hs * 0.55, L.footerY - hs * 0.36];
@@ -122,7 +114,6 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
   const warm = new Color(C.ECLIPSE);
   return (
     <group>
-      {gridOn > 0 && <lineSegments geometry={grid}><lineBasicMaterial color={dim(C.ARDOISE, 0.35)} transparent opacity={gridOn} depthWrite={false} toneMapped={false} /></lineSegments>}
       {/* the beam: the dégradé Éclipse in motion (opaque, so the glass can bend it), plus a soft glow */}
       {beamOn && <mesh geometry={geo.beam} position={P1} rotation={[0, 0, ang]} scale={[beamLen, 1, 1]}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
       {beamOn && <mesh geometry={geo.beamGlow} position={P1} rotation={[0, 0, ang]} scale={[beamLen, 1, 1]}><meshBasicMaterial vertexColors transparent opacity={0.25} blending={AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>}

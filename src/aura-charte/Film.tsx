@@ -7,6 +7,7 @@ import { C, FPS, TL } from "./lib";
 import { Format, pageAt } from "./layout";
 import { Page } from "./Page";
 import { LogoOverlay } from "./LogoOverlay";
+import { ConstructionGrid } from "./Grid";
 import { LogoPage } from "./pages/LogoPage";
 import { Couleurs } from "./pages/Couleurs";
 import { Typo } from "./pages/Typo";
@@ -49,6 +50,7 @@ export const AuraCharte: React.FC<{ format: Format }> = ({ format }) => {
       ) : (
         <MotionBlur><Pages format={format} /></MotionBlur>
       )}
+      <ConstructionGrid t={t} format={format} />
       <LogoOverlay t={t} format={format} />
       <Page format={format} t={t} />
     </AbsoluteFill>
