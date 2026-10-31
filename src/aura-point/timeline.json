@@ -1,0 +1,12 @@
+{
+  "fps": 60,
+  "bpm": 120,
+  "duration": 17,
+  "s1": { "cursorIn": 0.15, "click": 1.0, "letGo": 1.5, "heroIn": 1.6, "jump": 2.0, "land": 2.36 },
+  "s2": { "leave": 3.0, "axes": 3.05, "draw": 3.5, "peak": 4.0, "callout": 4.5, "settle": 4.75 },
+  "s3": { "shoot": 5.5, "light": 6.0, "square": 6.5, "pill": 7.0, "night": 7.25, "dot": 7.5 },
+  "s4": { "poles": [8.0, 8.5, 9.0, 9.5, 10.0, 10.25], "open": 10.5 },
+  "s5": { "halftone": 10.62, "cream": 11.5 },
+  "s6": { "card": 11.5, "wordmark": 12.0, "studio": 12.5, "sign": 13.0, "out": 15.5 },
+  "s7": { "graph": 15.85, "toggle": 16.25, "refill": 16.5 }
+}

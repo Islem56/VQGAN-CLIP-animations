@@ -8,3 +8,7 @@ out
 
 # Python bytecode
 __pycache__
+
+# runtime audio (Mixkit: never commit) and the sound tools' venv
+.sound-cache/
+.sound-effects/
