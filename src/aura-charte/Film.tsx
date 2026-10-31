@@ -5,7 +5,6 @@ import { C, FPS } from "./lib";
 import { pageAt } from "./layout";
 import { Page } from "./Page";
 import { useFont } from "../shared/motion";
-
 export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
   const ready = useFont(), t = useCurrentFrame() / FPS;
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.COSMOS }} />;
