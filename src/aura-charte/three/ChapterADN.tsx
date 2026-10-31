@@ -105,8 +105,8 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
   const vol = ease.inOut(lin(t, TL.volume, 0.8)), turn: V3 = [0.32 * vol, -0.48 * vol, 0];
   const plates = [
     { key: "circle", g: geo.circle, end: at(format, 1.25, 1.2), from: [8, 0, 0], beat: TL.plans[0], depth: lerp(0.16, 0.9, vol) },
-    { key: "square", g: geo.square, end: at(format, -1.55, -0.25), from: [-8, 0, 0], beat: TL.plans[1], depth: lerp(0.16, 2.2, vol) },
-    { key: "triangle", g: geo.triangle, end: at(format, -0.1, -2.15), from: [0, -10, 0], beat: TL.plans[2], depth: lerp(0.16, 0.9, vol) },
+    { key: "square", g: geo.square, end: at(format, -1.9, -0.6), from: [-8, 0, 0], beat: TL.plans[1], depth: lerp(0.16, 2.2, vol) },
+    { key: "triangle", g: geo.triangle, end: at(format, 0.35, -2.55), from: [0, -10, 0], beat: TL.plans[2], depth: lerp(0.16, 0.9, vol) },
   ];
   const cutA = TL.cut[0], cutL = TL.cut[1];
   const triGone = 1 - ease.in(lin(t, cutA, 0.25)), ring = prog(t, cutA, 0.25);   // the set square withdraws as the compass circle draws

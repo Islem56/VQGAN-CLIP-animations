@@ -35,7 +35,7 @@ export const LogoOverlay: React.FC<{ t: number; format: Format }> = ({ t, format
         </radialGradient>
       </defs>
       <g opacity={out}>
-        <Construction x0={L.mono.x} y0={L.mono.y} w={L.mono.w} color={C.BRUME} opacity={0.38} strokeWidth={sw * 0.6} progress={draw} />
+        <Construction x0={L.mono.x} y0={L.mono.y} w={L.mono.w} color={C.BRUME} opacity={0.42} strokeWidth={sw * 0.75} progress={draw} />
         {LETTERS.map((ids, i) => {
           const e = env(TL.letters[i]); if (e <= 0) return null;
           return <g key={i}>{ids.map((id) => <path key={id} d={modulePath(id, L.mono.x, L.mono.y, k)} fill={C.HALO} fillOpacity={0.45 * e} stroke={C.LUNAIRE} strokeWidth={sw * 1.2} strokeOpacity={clamp(e)} strokeLinejoin="round" />)}</g>;
