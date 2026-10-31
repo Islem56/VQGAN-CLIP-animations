@@ -5,6 +5,8 @@ import { C, FPS, TL } from "./lib";
 import { Backdrop, Stage } from "./three/Stage";
 import { BACKDROP_SIZE, backdropAt, ChapterLogo, warmAt } from "./three/ChapterLogo";
 import { LogoOverlay } from "./LogoOverlay";
+import { LogoPage } from "./pages/LogoPage";
+import { Couleurs } from "./pages/Couleurs";
 import { ChapterADN } from "./three/ChapterADN";
 import { cameraAt } from "./three/anamorph";
 import { pageAt } from "./layout";
@@ -22,6 +24,8 @@ export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
           <ChapterLogo t={t} format={format} />
         </Stage>
       )}
+      <LogoPage t={t} format={format} />
+      <Couleurs t={t} format={format} />
       <LogoOverlay t={t} format={format} />
       <Page format={format} t={t} />
     </AbsoluteFill>
