@@ -1,7 +1,8 @@
 // Chapter 02 · ADN — the Bauhaus, from the point to the volume. The orange point leaves the page number and draws a
 // line of light (hot at its head, cooling to violet behind it); a circle, a square and a triangle of glass enter on the
-// beats, take thickness while the camera starts to orbit, and are cut along compass circles into the six pieces of the
-// monogram, which drift to their places in space.
+// beats and take thickness while the camera starts to orbit. Then the cut: the circle gives the A (its dome is a half
+// circle), the square gives the two L's, and the triangle — the drafter's set square — draws the compass circle and
+// withdraws into it. The six pieces drift to their places in space.
 import React, { useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, RingGeometry, Shape, SRGBColorSpace } from "three";
 import { C, clamp, ease, lerp, lin, prog, sp, SPRING, TL } from "../lib";
@@ -108,7 +109,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
     { key: "triangle", g: geo.triangle, end: at(format, -0.1, -2.15), from: [0, -10, 0], beat: TL.plans[2], depth: lerp(0.16, 0.9, vol) },
   ];
   const cutA = TL.cut[0], cutL = TL.cut[1];
-  const discGone = 1 - ease.in(lin(t, cutA, 0.25)), ring = prog(t, cutA, 0.25);
+  const triGone = 1 - ease.in(lin(t, cutA, 0.25)), ring = prog(t, cutA, 0.25);   // the set square withdraws as the compass circle draws
   const ringGeo = useMemo(() => new RingGeometry(1.44, 1.458, 96, 1, Math.PI / 2, Math.max(0.001, Math.PI * 2 * ring)), [ring]);
   const flash = (t0: number) => Math.max(0, 1 - Math.abs(t - t0 - 0.02) / 0.06);
   const warm = new Color(C.ECLIPSE);
@@ -125,9 +126,9 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
       </group>}
       {plates.map((pl, i) => {
         const q = sp(t, pl.beat, SPRING.heavy); if (q <= 0) return null;
-        const gone = (pl.key === "circle" && t >= cutA + 0.25) || (pl.key === "triangle" && t >= cutA) || (pl.key === "square" && t >= cutL);
+        const gone = (pl.key === "circle" && t >= cutA) || (pl.key === "triangle" && t >= cutA + 0.25) || (pl.key === "square" && t >= cutL);
         if (gone) return null;
-        const pos = mix([pl.end[0] + pl.from[0], pl.end[1] + pl.from[1], 0], pl.end, q), sc = ADN[format].s * (pl.key === "circle" ? discGone : 1);
+        const pos = mix([pl.end[0] + pl.from[0], pl.end[1] + pl.from[1], 0], pl.end, q), sc = ADN[format].s * (pl.key === "triangle" ? triGone : 1);
         const edge = geo.edges[pl.key]; tintEdge(edge, pos, sc, point, t < TL.point + 0.5 ? 0 : 1);
         return (
           <group key={i} position={pos} rotation={turn}>
@@ -141,7 +142,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
       {/* the six pieces: the prism gives the A, the cube the two L's */}
       {[...A_PIECES, ...L_PIECES].map((id) => {
         const isA = A_PIECES.includes(id), birth = isA ? cutA : cutL; if (t < birth) return null;
-        const src = isA ? plates[2] : plates[1], s = pieceAt(id, t, format, { pos: src.end, rot: turn, birth });
+        const src = isA ? plates[0] : plates[1], s = pieceAt(id, t, format, { pos: src.end, rot: turn, birth });
         const towards: V3 = t >= TL.riser ? [0, 0, 0] : point, edge = geo.pieceEdges[id];
         tintEdge(edge, s.position, 1, towards, t >= TL.riser ? 0.35 + 0.65 * (warmSpot?.k ?? 0) : 0.6);
         return (
@@ -152,7 +153,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
         );
       })}
       {/* a two-frame flash hides each swap */}
-      {[[cutA, plates[2].end], [cutL, plates[1].end]].map(([t0, c], i) => flash(t0 as number) > 0 &&
+      {[[cutA, plates[0].end], [cutL, plates[1].end]].map(([t0, c], i) => flash(t0 as number) > 0 &&
         <sprite key={i} position={[(c as V3)[0], (c as V3)[1], 1.2]} scale={[4.5, 4.5, 1]}><spriteMaterial map={geo.glow} color={C.LUNAIRE} transparent opacity={0.9 * flash(t0 as number)} blending={AdditiveBlending} depthWrite={false} toneMapped={false} /></sprite>)}
     </group>
   );
