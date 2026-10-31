@@ -90,6 +90,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
 
   // the construction grid draws on from the centre in 0.5 s
   const grid = useMemo(() => new BufferGeometry(), []);
+  const gridOn = 1 - ease.inOut(lin(t, TL.volume, 0.8));   // gone before the orbit: 1-px lines shimmer when the camera moves
   const g = prog(t, 0, 0.5), step = 0.8, [ox, oy] = ADN[format].a, half = format === "v" ? [7, 11] : [14, 8], pts: number[] = [];
   for (let x = -half[0]; x <= half[0] + 1e-6; x += step) pts.push(ox + x, oy - half[1] * g, -0.6, ox + x, oy + half[1] * g, -0.6);
   for (let y = -half[1]; y <= half[1] + 1e-6; y += step) pts.push(ox - half[0] * g, oy + y, -0.6, ox + half[0] * g, oy + y, -0.6);
@@ -121,7 +122,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
   const warm = new Color(C.ECLIPSE);
   return (
     <group>
-      <lineSegments geometry={grid}><lineBasicMaterial color={dim(C.ARDOISE, 0.35)} toneMapped={false} /></lineSegments>
+      {gridOn > 0 && <lineSegments geometry={grid}><lineBasicMaterial color={dim(C.ARDOISE, 0.35)} transparent opacity={gridOn} depthWrite={false} toneMapped={false} /></lineSegments>}
       {/* the beam: the dégradé Éclipse in motion (opaque, so the glass can bend it), plus a soft glow */}
       {beamOn && <mesh geometry={geo.beam} position={P1} rotation={[0, 0, ang]} scale={[beamLen, 1, 1]}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
       {beamOn && <mesh geometry={geo.beamGlow} position={P1} rotation={[0, 0, ang]} scale={[beamLen, 1, 1]}><meshBasicMaterial vertexColors transparent opacity={0.25} blending={AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>}
@@ -140,7 +141,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
         return (
           <group key={i} position={pos} rotation={turn}>
             <mesh geometry={pl.g} material={glass} scale={[sc, sc, pl.depth * ADN[format].s]} />
-            <lineLoop geometry={edge} position={[0, 0, (pl.depth * ADN[format].s) / 2 + 0.035]} scale={[sc, sc, 1]}><lineBasicMaterial vertexColors toneMapped={false} /></lineLoop>
+            <lineLoop geometry={edge} position={[0, 0, (pl.depth * ADN[format].s) / 2 + 0.035]} scale={[sc, sc, 1]}><lineBasicMaterial vertexColors transparent opacity={0.7} toneMapped={false} /></lineLoop>
           </group>
         );
       })}
@@ -155,7 +156,7 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
         return (
           <group key={id} position={s.position} rotation={s.rotation} scale={[s.scale, s.scale, s.scale]}>
             <mesh geometry={geo.pieces[id]} material={glass} />
-            <lineLoop geometry={edge}><lineBasicMaterial vertexColors toneMapped={false} /></lineLoop>
+            <lineLoop geometry={edge}><lineBasicMaterial vertexColors transparent opacity={0.7} toneMapped={false} /></lineLoop>
           </group>
         );
       })}

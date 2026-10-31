@@ -1,5 +1,5 @@
 // The signature: the last page brightens to Lunaire, no page frame. The official lockup — monogram, AURA LUNA,
-// DIGITAL · DESIGN · PRODUCTION, the signature — builds in a second and then holds, with a 2 % push-in.
+// DIGITAL · DESIGN · PRODUCTION, the signature — builds in a second and then holds, perfectly still.
 import React from "react";
 import { C, ease, lerp, lin, TL } from "../lib";
 import { Format, LAYOUT } from "../layout";
@@ -16,7 +16,7 @@ export const signatureLight = (t: number) => ease.inOut(lin(t, TL.sign, 0.6));
 export const Signature: React.FC<{ t: number; format: Format }> = ({ t, format }) => {
   if (t < TL.sign) return null;
   const L = LAYOUT[format], { W, H } = L, c = SG[format], s0 = TL.sign;
-  const push = lerp(1, 1.02, ease.inOut(lin(t, s0 + 0.6, TL.end - s0 - 0.6))), cx = W / 2, cy = (c.mono.y + c.sig[c.sig.length - 1][0]) / 2;
+  const cx = W / 2;
   const wm = wordmarkLetters(c.wm.cx, c.wm.base, c.wm.s), desc = ease.out(lin(t, s0 + 0.9, 0.5)), sig = ease.out(lin(t, s0 + 1.1, 0.5));
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", inset: 0 }}>
@@ -25,7 +25,7 @@ export const Signature: React.FC<{ t: number; format: Format }> = ({ t, format }
         <stop offset="0" stopColor={C.LUNAIRE} /><stop offset="0.5" stopColor={C.LUNAIRE} /><stop offset="0.8" stopColor={C.LUNAIRE} stopOpacity={0.45} /><stop offset="1" stopColor={C.LUNAIRE} stopOpacity={0} />
       </radialGradient>
       <rect width={W} height={H} fill={signatureLight(t) >= 1 ? C.LUNAIRE : "url(#sgLight)"} />
-      <g transform={`translate(${cx} ${cy}) scale(${push.toFixed(5)}) translate(${-cx} ${-cy})`}>
+      <g>
         <MonoBase gid="sg" x0={c.mono.x} y0={c.mono.y} w={c.mono.w} opacity={ease.out(lin(t, s0 + 0.3 + 0.045 * 5, 0.45))} />
         {MODULES.map((id, i) => {
           const e = ease.out(lin(t, s0 + 0.3 + 0.045 * i, 0.45));

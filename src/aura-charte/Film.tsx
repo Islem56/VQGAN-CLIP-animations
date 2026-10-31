@@ -1,10 +1,10 @@
 // Aura Luna — « La charte en mouvement » (31.7 s, 16 bars at 121 BPM). The film is assembled here, layer by layer:
 // the 3D glass (chapters 02–03, until just after the flash), the flat pages (from the flash on, with true motion blur),
-// the flash, the guidelines page frame, the grain.
+// the flash, the guidelines page frame. No grain: it made still type flicker.
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { C, FPS, TL } from "./lib";
-import { Format, LAYOUT, pageAt } from "./layout";
+import { Format, pageAt } from "./layout";
 import { Page } from "./Page";
 import { LogoOverlay } from "./LogoOverlay";
 import { LogoPage } from "./pages/LogoPage";
@@ -15,7 +15,7 @@ import { Backdrop, Stage } from "./three/Stage";
 import { ChapterADN } from "./three/ChapterADN";
 import { BACKDROP_SIZE, backdropAt, ChapterLogo, warmAt } from "./three/ChapterLogo";
 import { cameraAt } from "./three/anamorph";
-import { Grain, MotionBlur, useFont } from "../shared/motion";
+import { MotionBlur, useFont } from "../shared/motion";
 
 /** when the 3D stage hands over to the flat pages (under the flash's peak) */
 export const HANDOVER = TL.flash + 0.2;
@@ -36,7 +36,7 @@ const Pages: React.FC<{ format: Format }> = ({ format }) => {
 };
 
 export const AuraCharte: React.FC<{ format: Format }> = ({ format }) => {
-  const ready = useFont(), t = useCurrentFrame() / FPS, { W, H } = LAYOUT[format];
+  const ready = useFont(), t = useCurrentFrame() / FPS;
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.COSMOS }} />;
   return (
     <AbsoluteFill style={{ backgroundColor: ground(t) }}>
@@ -51,7 +51,6 @@ export const AuraCharte: React.FC<{ format: Format }> = ({ format }) => {
       )}
       <LogoOverlay t={t} format={format} />
       <Page format={format} t={t} />
-      <Grain W={W} H={H} opacity={0.08} />
     </AbsoluteFill>
   );
 };
