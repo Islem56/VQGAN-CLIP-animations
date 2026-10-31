@@ -6,9 +6,9 @@ import MONO from "../aura-point/data/monogram.json";
 import { C, clamp, ease, lerp, lin, prog, TL } from "./lib";
 import { Format, LAYOUT } from "./layout";
 import { ModuleId } from "./three/shapes";
+import { Construction } from "./pages/construction";
 
 const LETTERS: ModuleId[][] = [["S", "B", "C"], ["At", "Ab", "B"], ["C", "D"]];   // A, the left L, the right L (the A's legs are shared)
-const CIRCLES = [[303.5, 150, 151.5], [0, 150, 152], [152, 150, 152], [300, 150, 148], [455, 150, 155]];
 
 export const modulePath = (id: ModuleId, x0: number, y0: number, k: number) => {
   const l = (MONO.modules as Record<ModuleId, { loop: number[] }>)[id].loop; let d = "";
@@ -35,11 +35,7 @@ export const LogoOverlay: React.FC<{ t: number; format: Format }> = ({ t, format
         </radialGradient>
       </defs>
       <g opacity={out}>
-        <g fill="none" stroke={C.BRUME} strokeWidth={sw} opacity={0.45}>
-          {CIRCLES.map(([x, y, r], i) => { const c = 2 * Math.PI * r * k; return <circle key={i} cx={X(x)} cy={Y(y)} r={r * k} strokeDasharray={c} strokeDashoffset={c * (1 - draw)} transform={`rotate(-90 ${X(x)} ${Y(y)})`} />; })}
-          {[0, 150, 300].map((y) => <line key={`h${y}`} x1={X(-30)} x2={lerp(X(-30), X(670), draw)} y1={Y(y)} y2={Y(y)} strokeDasharray="6 6" />)}
-          {[0, 152, 300, 455, 640].map((x) => <line key={`v${x}`} y1={Y(-28)} y2={lerp(Y(-28), Y(328), draw)} x1={X(x)} x2={X(x)} strokeDasharray="6 6" />)}
-        </g>
+        <Construction x0={L.mono.x} y0={L.mono.y} w={L.mono.w} color={C.BRUME} opacity={0.38} strokeWidth={sw * 0.6} progress={draw} />
         {LETTERS.map((ids, i) => {
           const e = env(TL.letters[i]); if (e <= 0) return null;
           return <g key={i}>{ids.map((id) => <path key={id} d={modulePath(id, L.mono.x, L.mono.y, k)} fill={C.HALO} fillOpacity={0.45 * e} stroke={C.LUNAIRE} strokeWidth={sw * 1.2} strokeOpacity={clamp(e)} strokeLinejoin="round" />)}</g>;
