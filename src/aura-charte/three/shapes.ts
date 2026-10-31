@@ -19,4 +19,4 @@ export const MONO_SIZE: [number, number] = [MONO.w, MONO.h];
 
 /** a slab of glass: the shape extruded towards +z, with a small rounded bevel */
 export const extrude = (shape: Shape, depth: number, bevel = 2) =>
-  new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 24 });
+  new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: 3, curveSegments: 24 });   // the bevel rounds inwards: the outline never grows

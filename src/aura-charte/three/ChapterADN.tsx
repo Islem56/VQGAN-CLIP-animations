@@ -10,7 +10,6 @@ import { measure } from "../../shared/motion";
 import { cameraAt, PIECE_DEPTHS, placePiece, screenToWorld } from "./anamorph";
 import { dim, glassMaterial } from "./materials";
 import { extrude, ModuleId, moduleCentre, moduleShape } from "./shapes";
-import { Backdrop } from "./Stage";
 
 type V3 = [number, number, number];
 const v3 = (a: number[]): V3 => [a[0], a[1], a[2] ?? 0];
@@ -79,11 +78,12 @@ export const pieceAt = (id: ModuleId, t: number, format: Format, from: { pos: V3
   return { position: mix(start, end.position, e), scale: lerp(s0, end.scale, e) / 100, rotation: mix(from.rot, [0, 0, 0], e) };
 };
 
-export const ChapterADN: React.FC<{ t: number; format: Format }> = ({ t, format }) => {
+export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: number } | null }> = ({ t, format, warmSpot }) => {
   const L = LAYOUT[format];
   const geo = useMemo(() => ({
     beam: beamGeometry(0.035), beamGlow: beamGeometry(0.12), circle: plate(circleShape()), square: plate(squareShape()), triangle: plate(triangleShape()),
     edges: { circle: edgeGeometry(circleShape()), square: edgeGeometry(squareShape()), triangle: edgeGeometry(triangleShape()) } as Record<string, BufferGeometry>,
+    pieceEdges: Object.fromEntries([...A_PIECES, ...L_PIECES].map((id) => { const [cx, cy] = moduleCentre(id), s = moduleShape(id); s.getPoints(); const g = edgeGeometry(s); g.translate(-cx, -cy, 0.5); return [id, g]; })) as unknown as Record<ModuleId, BufferGeometry>,
     glow: glowTexture(), pieces: Object.fromEntries([...A_PIECES, ...L_PIECES].map((id) => [id, pieceGeometry(id)])) as unknown as Record<ModuleId, BufferGeometry>,
   }), []);
   const glass = glassMaterial(t);
@@ -121,7 +121,6 @@ export const ChapterADN: React.FC<{ t: number; format: Format }> = ({ t, format 
   const warm = new Color(C.ECLIPSE);
   return (
     <group>
-      <group position={[ox, oy, 0]}><Backdrop z={-8} size={format === "v" ? 17 : 21} /></group>
       <lineSegments geometry={grid}><lineBasicMaterial color={dim(C.ARDOISE, 0.35)} toneMapped={false} /></lineSegments>
       {/* the beam: the dégradé Éclipse in motion (opaque, so the glass can bend it), plus a soft glow */}
       {beamOn && <mesh geometry={geo.beam} position={P1} rotation={[0, 0, ang]} scale={[beamLen, 1, 1]}><meshBasicMaterial vertexColors toneMapped={false} /></mesh>}
@@ -151,7 +150,14 @@ export const ChapterADN: React.FC<{ t: number; format: Format }> = ({ t, format 
       {[...A_PIECES, ...L_PIECES].map((id) => {
         const isA = A_PIECES.includes(id), birth = isA ? cutA : cutL; if (t < birth) return null;
         const src = isA ? plates[2] : plates[1], s = pieceAt(id, t, format, { pos: src.end, rot: turn, birth });
-        return <mesh key={id} geometry={geo.pieces[id]} material={glass} position={s.position} rotation={s.rotation} scale={[s.scale, s.scale, s.scale]} />;
+        const towards: V3 = t >= TL.riser ? [0, 0, 0] : point, edge = geo.pieceEdges[id];
+        tintEdge(edge, s.position, 1, towards, t >= TL.riser ? 0.35 + 0.65 * (warmSpot?.k ?? 0) : 0.6);
+        return (
+          <group key={id} position={s.position} rotation={s.rotation} scale={[s.scale, s.scale, s.scale]}>
+            <mesh geometry={geo.pieces[id]} material={glass} />
+            <lineLoop geometry={edge}><lineBasicMaterial vertexColors toneMapped={false} /></lineLoop>
+          </group>
+        );
       })}
       {/* a two-frame flash hides each swap */}
       {[[cutA, plates[2].end], [cutL, plates[1].end]].map(([t0, c], i) => flash(t0 as number) > 0 &&
@@ -159,3 +165,4 @@ export const ChapterADN: React.FC<{ t: number; format: Format }> = ({ t, format 
     </group>
   );
 };
+

@@ -30,19 +30,28 @@ const Environment: React.FC = () => {
   return null;
 };
 
-/** the Halo light as an opaque plane: Halo at the centre (70 %) falling off into Cosmos */
-const haloTexture = () => {
-  const c = document.createElement("canvas"); c.width = c.height = 512;
-  const g = c.getContext("2d")!, r = g.createRadialGradient(256, 256, 0, 256, 256, 256);
+/** the Halo light as an opaque plane: Halo at the centre falling off into Cosmos, with an optional Éclipse spot
+    (the point burning behind the glass). Opaque on purpose: three.js transmission only bends opaque things. */
+export type Warm = { u: number; v: number; k: number };
+const drawBackdrop = (ctx: CanvasRenderingContext2D, warm: Warm | null) => {
+  const r = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
   r.addColorStop(0, C.HALO); r.addColorStop(0.18, C.LUNA); r.addColorStop(0.5, C.NUIT); r.addColorStop(1, C.COSMOS);
-  g.fillStyle = r; g.fillRect(0, 0, 512, 512);
-  const tex = new CanvasTexture(c); tex.colorSpace = SRGBColorSpace; return tex;
+  ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = r; ctx.fillRect(0, 0, 512, 512);
+  if (warm && warm.k > 0) {
+    const x = warm.u * 512, y = (1 - warm.v) * 512, w = ctx.createRadialGradient(x, y, 0, x, y, 46);
+    w.addColorStop(0, C.ECLIPSE); w.addColorStop(0.3, C.ECLIPSE + "AA"); w.addColorStop(1, C.ECLIPSE + "00");
+    ctx.globalAlpha = warm.k; ctx.fillStyle = w; ctx.fillRect(0, 0, 512, 512); ctx.globalAlpha = 1;
+  }
 };
 
-export const Backdrop: React.FC<{ z?: number; size?: number; strength?: number }> = ({ z = -8, size = 34 }) => {
-  const tex = useMemo(haloTexture, []);
+export const Backdrop: React.FC<{ at?: [number, number]; z?: number; size?: number; warm?: Warm | null }> = ({ at = [0, 0], z = -8, size = 34, warm = null }) => {
+  const [ctx, tex] = useMemo(() => {
+    const c = document.createElement("canvas"); c.width = c.height = 512;
+    const t = new CanvasTexture(c); t.colorSpace = SRGBColorSpace; return [c.getContext("2d")!, t] as const;
+  }, []);
+  drawBackdrop(ctx, warm); tex.needsUpdate = true;
   return (
-    <mesh position={[0, 0, z]}>
+    <mesh position={[at[0], at[1], z]}>
       <planeGeometry args={[size, size]} />
       <meshBasicMaterial map={tex} toneMapped={false} />
     </mesh>

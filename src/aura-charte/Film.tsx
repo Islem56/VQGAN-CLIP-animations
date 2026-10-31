@@ -2,7 +2,9 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { C, FPS, TL } from "./lib";
-import { Stage } from "./three/Stage";
+import { Backdrop, Stage } from "./three/Stage";
+import { BACKDROP_SIZE, backdropAt, ChapterLogo, warmAt } from "./three/ChapterLogo";
+import { LogoOverlay } from "./LogoOverlay";
 import { ChapterADN } from "./three/ChapterADN";
 import { cameraAt } from "./three/anamorph";
 import { pageAt } from "./layout";
@@ -13,7 +15,14 @@ export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.COSMOS }} />;
   return (
     <AbsoluteFill style={{ backgroundColor: pageAt(t).dark ? C.COSMOS : C.LUNAIRE }}>
-      {t < TL.flash + 0.3 && <Stage format={format} camera={cameraAt(t, format)}><ChapterADN t={t} format={format} /></Stage>}
+      {t < TL.flash + 0.2 && (
+        <Stage format={format} camera={cameraAt(t, format)}>
+          <Backdrop at={backdropAt(t, format)} size={BACKDROP_SIZE[format]} warm={warmAt(t, format)} />
+          <ChapterADN t={t} format={format} warmSpot={warmAt(t, format)} />
+          <ChapterLogo t={t} format={format} />
+        </Stage>
+      )}
+      <LogoOverlay t={t} format={format} />
       <Page format={format} t={t} />
     </AbsoluteFill>
   );

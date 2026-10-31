@@ -18,23 +18,33 @@ export const Moon: React.FC<{ cx: number; cy: number; r: number; f: number; colo
   );
 };
 
-const Frame: React.FC<{ format: Format; p: PageMeta; t: number }> = ({ format, p, t }) => {
+type Part = "header" | "section" | "eyebrow" | "title" | "body" | "footer";
+const PARTS: Part[] = ["header", "section", "eyebrow", "title", "body", "footer"];
+const same = (a: PageMeta, b: PageMeta, part: Part) => a.dark === b.dark && ({
+  header: true, section: a.section === b.section, eyebrow: a.eyebrow === b.eyebrow, title: String(a.title) === String(b.title),
+  body: String(a.body) === String(b.body), footer: a.phase === b.phase && a.pageNo === b.pageNo,
+} as Record<Part, boolean>)[part];
+
+const Frame: React.FC<{ format: Format; p: PageMeta; t: number; parts?: Part[] }> = ({ format, p, t, parts = PARTS }) => {
+  const has = (part: Part) => parts.includes(part);
   const L = LAYOUT[format], k = ink(p.dark), hs = L.headerSize, track = hs * 0.2;
   const lift = 12 * (1 - prog(t, 0.1, 0.6));
   const numW = measure(p.pageNo, 600, hs, track);
   return (
     <g>
-      <text x={L.margin} y={L.headerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>AURA LUNA — BRAND GUIDELINES</text>
-      <text x={L.W - L.margin} y={L.sectionY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.section}</text>
+      {has("header") && <text x={L.margin} y={L.headerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>AURA LUNA — BRAND GUIDELINES</text>}
+      {has("section") && <text x={L.W - L.margin} y={L.sectionY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.section}</text>}
       <g transform={`translate(0 ${lift.toFixed(2)})`}>
-        {p.eyebrow && <text x={L.margin} y={L.eyebrowY} fill={k.eyebrow} style={typeStyle(600, L.eyebrowSize, L.eyebrowSize * 0.26)}>{p.eyebrow}</text>}
-        {p.title?.map((line, i) => <text key={i} x={L.margin} y={L.titleY + i * L.titleLeading} fill={k.title} style={typeStyle(400, L.titleSize, -L.titleSize * 0.01)}>{line}</text>)}
-        {p.body?.map((line, i) => <text key={i} x={L.margin} y={L.bodyY + i * L.bodySize * 1.5} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(400, L.bodySize)}>{line}</text>)}
+        {has("eyebrow") && p.eyebrow && <text x={L.margin} y={L.eyebrowY} fill={k.eyebrow} style={typeStyle(600, L.eyebrowSize, L.eyebrowSize * 0.26)}>{p.eyebrow}</text>}
+        {has("title") && p.title?.map((line, i) => <text key={i} x={L.margin} y={L.titleY + i * L.titleLeading} fill={k.title} style={typeStyle(400, L.titleSize, -L.titleSize * 0.01)}>{line}</text>)}
+        {has("body") && p.body?.map((line, i) => <text key={i} x={L.margin} y={L.bodyY + i * L.bodySize * 1.5} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(400, L.bodySize)}>{line}</text>)}
       </g>
+      {has("footer") && <g>
       <Moon cx={L.margin + hs * 0.5} cy={L.footerY - hs * 0.36} r={hs * 0.5} f={p.phaseFraction} color={k.title} />
       <text x={L.margin + hs * 1.6} y={L.footerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.phase}</text>
       {!(t >= TL.point && t < TL.space) && <circle cx={L.W - L.margin - numW - hs * 0.55} cy={L.footerY - hs * 0.36} r={hs * 0.22} fill={C.ECLIPSE} />}
       <text x={L.W - L.margin} y={L.footerY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.pageNo}</text>
+      </g>}
     </g>
   );
 };
@@ -56,12 +66,15 @@ export const Triad: React.FC<{ format: Format; t: number }> = ({ format, t }) =>
 /** the page frame at time t, cross-fading for 0.3 s after each change */
 export const Page: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
   const L = LAYOUT[format], i = pageIndexAt(t), [t0, cur] = PAGE_CHANGES[i];
-  const p = i === 0 ? 1 : clamp((t - t0) / 0.3), prev = i > 0 ? PAGE_CHANGES[i - 1][1] : null, enter = prog(t, 0, 0.4);
+  const prev = i > 0 ? PAGE_CHANGES[i - 1][1] : null, enter = prog(t, 0, 0.4);
+  const out = prev ? 1 - clamp((t - t0) / 0.15) : 0, inn = prev ? clamp((t - t0 - 0.15) / 0.15) : 1;
+  const kept = prev ? PARTS.filter((part) => same(prev, cur, part)) : PARTS, changed = PARTS.filter((part) => !kept.includes(part));
   return (
     <svg width={L.W} height={L.H} viewBox={`0 0 ${L.W} ${L.H}`} style={{ position: "absolute", inset: 0 }}>
       <g opacity={enter}>
-        {prev && prev.frame && p < 1 && <g opacity={1 - p}><Frame format={format} p={prev} t={t} /></g>}
-        {cur.frame && <g opacity={p}><Frame format={format} p={cur} t={t} /></g>}
+        {cur.frame && prev?.frame && <Frame format={format} p={cur} t={t} parts={kept} />}
+        {prev && prev.frame && out > 0 && <g opacity={out}><Frame format={format} p={prev} t={t} parts={changed} /></g>}
+        {cur.frame && <g opacity={inn}><Frame format={format} p={cur} t={t} parts={prev?.frame ? changed : PARTS} /></g>}
       </g>
       <Triad format={format} t={t} />
     </svg>
