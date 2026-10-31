@@ -101,12 +101,12 @@ export const ChapterADN: React.FC<{ t: number; format: Format; warmSpot?: { k: n
   const dotPx: [number, number] = [L.W - L.margin - measure(p.pageNo, 600, hs, hs * 0.2) - hs * 0.55, L.footerY - hs * 0.36];
   const P0 = v3(screenToWorld(dotPx[0], dotPx[1], cameraAt(TL.point, format), format).toArray());
   const P1 = at(format, -2.7, -2.7), P2 = at(format, 2.5, 2.7);
-  const jump = ease.inOut(lin(t, TL.point, 0.35)), draw = ease.inOut(lin(t, TL.point + 0.35, 0.5));
+  const jump = ease.inOut(lin(t, TL.point, 0.35)), draw = ease.inOut(lin(t, TL.line, 0.5));   // POINT, then on the next downbeat LIGNE
   let point: V3 = t < TL.point ? P0 : t < TL.point + 0.35 ? (() => { const q = mix(P0, P1, jump); q[1] += 1.6 * Math.sin(Math.PI * jump); return q; })() : mix(P1, P2, draw);
   const rest = at(format, 2.9, -0.6, 0.6);                                       // during the volume, the point lights the side of the volumes
   point = mix(point, rest, ease.inOut(lin(t, TL.volume, 0.8)));
   const len = Math.hypot(P2[0] - P1[0], P2[1] - P1[1]), ang = Math.atan2(P2[1] - P1[1], P2[0] - P1[0]);
-  const beamLen = t < TL.point + 0.35 ? 0 : len * draw, beamOn = beamLen > 0.01 && t < TL.space;
+  const beamLen = t < TL.line ? 0 : len * draw, beamOn = beamLen > 0.01 && t < TL.space;
 
   // three plates of glass, one per beat, with a heavy spring; then thickness and their own turn
   const vol = ease.inOut(lin(t, TL.volume, 0.8)), turn: V3 = [0.32 * vol, -0.48 * vol, 0];

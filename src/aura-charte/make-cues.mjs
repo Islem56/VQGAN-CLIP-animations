@@ -11,7 +11,7 @@ const tap = (t, desc) => cue(t, "appear", desc, { glass: true });
 
 tap(0.1, "the page opens: a glass tap");
 cue(b.point, "appear", "the point leaves the page number");
-cue(b.point + 0.35, "movement", "the line of light");
+cue(b.line, "movement", "the line of light (LIGNE)");
 b.plans.forEach((t, i) => tap(t, `glass plane ${i + 1} (${["circle", "square", "triangle"][i]})`));
 cue(b.volume, "movement", "the planes take volume, the camera starts to orbit");
 b.cut.forEach((t, i) => tap(t, `the compass cut ${i + 1}`));

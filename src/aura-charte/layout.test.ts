@@ -44,3 +44,16 @@ describe("the page at each moment", () => {
     expect(pageAt(bar(11) + 0.1).body).toEqual(["Chez Aura Luna, le violet ne se pose pas : il éclaire."]);
   });
 });
+
+import { stepAt } from "./Page";
+describe("the Bauhaus sequence under the title", () => {
+  it("lights each word on the beat of its action, long enough to read", () => {
+    expect(stepAt(bar(1, 3) + 0.1)).toBe(0);
+    expect(stepAt(bar(2) + 0.1)).toBe(1);
+    expect(stepAt(bar(2, 3) + 0.1)).toBe(2);
+    expect(stepAt(bar(4) + 0.1)).toBe(3);
+    expect(stepAt(bar(5) + 0.1)).toBe(4);
+    expect(bar(2) - bar(1, 3)).toBeGreaterThanOrEqual(0.9);   // POINT
+    expect(bar(2, 3) - bar(2)).toBeGreaterThanOrEqual(0.9);   // LIGNE
+  });
+});

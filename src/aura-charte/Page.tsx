@@ -1,4 +1,4 @@
-// The guidelines page frame: header, eyebrow, title, body, the FORME · VOLUME · ESPACE triad and the footer
+// The guidelines page frame: header, eyebrow, title, body, the Bauhaus sequence (POINT · LIGNE · PLAN · VOLUME · ESPACE) and the footer
 // (moon phase, the orange dot, the page number). It cross-fades whenever the page changes.
 import React from "react";
 import { C, clamp, prog, TL } from "./lib";
@@ -49,14 +49,17 @@ const Frame: React.FC<{ format: Format; p: PageMeta; t: number; parts?: Part[] }
   );
 };
 
-/** FORME · VOLUME · ESPACE under the chapter title, the active word lit */
+/** the Bauhaus sequence under the chapter title (Kandinsky: the point becomes a line, lines become planes…):
+    POINT · LIGNE · PLAN · VOLUME · ESPACE, each word lit on the beat of its action */
+const STEPS = ["POINT", "LIGNE", "PLAN", "VOLUME", "ESPACE"] as const;
+export const stepAt = (t: number) => (t >= TL.space ? 4 : t >= TL.volume ? 3 : t >= TL.plans[0] ? 2 : t >= TL.line ? 1 : 0);
 export const Triad: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
-  const L = LAYOUT[format], o = prog(t, TL.point + 0.3, 0.3) * (1 - prog(t, TL.align - 0.3, 0.3));   // after the intro line has faded
+  const L = LAYOUT[format], o = prog(t, TL.point + 0.15, 0.2) * (1 - prog(t, TL.align - 0.3, 0.3));   // as the intro line fades
   if (o <= 0) return null;
-  const active = t >= TL.space ? "ESPACE" : t >= TL.volume ? "VOLUME" : "FORME", k = ink(true);
+  const active = STEPS[stepAt(t)], k = ink(true);
   return (
     <text x={L.margin} y={L.triadY} opacity={o} style={typeStyle(600, L.eyebrowSize, L.eyebrowSize * 0.26)}>
-      {["FORME", "VOLUME", "ESPACE"].map((w, i) => (
+      {STEPS.map((w, i) => (
         <tspan key={w} fill={w === active ? k.title : k.muted} opacity={w === active ? 1 : 0.5}>{(i ? "  ·  " : "") + w}</tspan>
       ))}
     </text>

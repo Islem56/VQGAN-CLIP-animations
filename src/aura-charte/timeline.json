@@ -5,6 +5,7 @@
   "_note": "every beat as [bar, beat] on the 4/4 grid of « Hazy After Hours » (121 BPM); lib.ts turns them into seconds",
   "beats": {
     "point": [1, 3],
+    "line": [2, 1],
     "plans": [[2, 3], [2, 4], [3, 1]],
     "volume": [4, 1],
     "cut": [[4, 3], [4, 4]],
