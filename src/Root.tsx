@@ -5,6 +5,7 @@ import { AuraPoint } from "./aura-point/Film";
 import { FPS, FRAMES, LAYOUT } from "./aura-point/lib";
 import { AuraCharte } from "./aura-charte/Film";
 import * as Charte from "./aura-charte/lib";
+import { REEL_FPS, REEL_SECONDS, ReelExemple } from "./aura-reel/Exemple";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -13,5 +14,6 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="AuraLunaPointVertical" component={AuraPoint} defaultProps={{ format: "v" as const }} durationInFrames={FRAMES} fps={FPS} width={LAYOUT.v.W} height={LAYOUT.v.H} />
     <Composition id="AuraLunaCharte" component={AuraCharte} defaultProps={{ format: "h" as const }} durationInFrames={Charte.FRAMES} fps={Charte.FPS} width={1920} height={1080} />
     <Composition id="AuraLunaCharteVertical" component={AuraCharte} defaultProps={{ format: "v" as const }} durationInFrames={Charte.FRAMES} fps={Charte.FPS} width={1080} height={1920} />
+    <Composition id="AuraReelExemple" component={ReelExemple} durationInFrames={REEL_FPS * REEL_SECONDS} fps={REEL_FPS} width={1080} height={1920} />
   </>
 );
