@@ -1,6 +1,6 @@
 // The optical illusion: six glass pieces at different depths that line up into the monogram from one viewpoint,
 // and the camera path that ends exactly there. World units: 1 unit = 100 monogram units, monogram centred on 0.
-import { Vector3 } from "three";
+import { PerspectiveCamera, Vector3 } from "three";
 import { ease, lerp, lin, TL } from "../lib";
 import { Format, LAYOUT } from "../layout";
 import { ModuleId, moduleCentre } from "./shapes";
@@ -41,4 +41,12 @@ export const cameraAt = (t: number, format: Format): Cam => {
   else { const e = ease.inOut(lin(t, TL.riser, TL.align - TL.riser)); angle = lerp(-8, 0, e); radius = lerp(0.72, 1, e); lift = lerp(0.04, 0, e); }
   const a = (angle * Math.PI) / 180, r = D * radius;
   return { position: [tx + r * Math.sin(a), ty + D * lift, r * Math.cos(a)], target: [tx, ty, 0], fov: H.fov };
+};
+
+/** the point on the plane z = 0 seen under a pixel of the frame, through camera `cam` */
+export const screenToWorld = (px: number, py: number, cam: Cam, format: Format) => {
+  const { W, H } = LAYOUT[format], c = new PerspectiveCamera(cam.fov, W / H, 0.1, 500);
+  c.position.set(...cam.position); c.lookAt(...cam.target); c.updateMatrixWorld(); c.updateProjectionMatrix();
+  const p = new Vector3((px / W) * 2 - 1, 1 - (py / H) * 2, 0.5).unproject(c), dir = p.sub(c.position).normalize();
+  return c.position.clone().add(dir.multiplyScalar(-c.position.z / dir.z));
 };

@@ -33,7 +33,7 @@ const Frame: React.FC<{ format: Format; p: PageMeta; t: number }> = ({ format, p
       </g>
       <Moon cx={L.margin + hs * 0.5} cy={L.footerY - hs * 0.36} r={hs * 0.5} f={p.phaseFraction} color={k.title} />
       <text x={L.margin + hs * 1.6} y={L.footerY} fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.phase}</text>
-      <circle cx={L.W - L.margin - numW - hs * 0.55} cy={L.footerY - hs * 0.36} r={hs * 0.22} fill={C.ECLIPSE} />
+      {!(t >= TL.point && t < TL.space) && <circle cx={L.W - L.margin - numW - hs * 0.55} cy={L.footerY - hs * 0.36} r={hs * 0.22} fill={C.ECLIPSE} />}
       <text x={L.W - L.margin} y={L.footerY} textAnchor="end" fill={k.muted} opacity={k.mutedOpacity} style={typeStyle(600, hs, track)}>{p.pageNo}</text>
     </g>
   );
@@ -41,7 +41,7 @@ const Frame: React.FC<{ format: Format; p: PageMeta; t: number }> = ({ format, p
 
 /** FORME · VOLUME · ESPACE under the chapter title, the active word lit */
 export const Triad: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
-  const L = LAYOUT[format], o = prog(t, TL.point, 0.3) * (1 - prog(t, TL.align - 0.3, 0.3));
+  const L = LAYOUT[format], o = prog(t, TL.point + 0.3, 0.3) * (1 - prog(t, TL.align - 0.3, 0.3));   // after the intro line has faded
   if (o <= 0) return null;
   const active = t >= TL.space ? "ESPACE" : t >= TL.volume ? "VOLUME" : "FORME", k = ink(true);
   return (

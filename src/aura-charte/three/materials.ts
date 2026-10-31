@@ -7,7 +7,7 @@ export const glassParams = (t: number) => ({
   roughness: lerp(0.38, 0.06, clamp(t / TL.align)),
   transmission: 1, ior: 1.45, thickness: 0.6, dispersion: 0.25,
   attenuationColor: C.LUNA, attenuationDistance: 2.5, clearcoat: 0.6, clearcoatRoughness: 0.1,
-  specularIntensity: 1, envMapIntensity: 0.35,
+  specularIntensity: 1, envMapIntensity: 0.8,
 });
 
 let shared: MeshPhysicalMaterial | null = null;

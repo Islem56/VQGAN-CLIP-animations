@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Box2, PerspectiveCamera, Vector3 } from "three";
-import { cameraAt, HERO_CAMERA, PIECE_DEPTHS, placePiece, worldOf } from "./anamorph";
+import { cameraAt, HERO_CAMERA, PIECE_DEPTHS, placePiece, screenToWorld, worldOf } from "./anamorph";
 import { MODULE_IDS, moduleCentre, moduleShape } from "./shapes";
 import { LAYOUT } from "../layout";
 import { bar, FPS } from "../lib";
@@ -49,6 +49,15 @@ describe("the camera path", () => {
         max = Math.max(max, p.distanceTo(prev)); prev = p;
       }
       expect(max).toBeLessThan(0.015 * D);
+    });
+  }
+});
+
+describe("screen to world", () => {
+  for (const format of ["h", "v"] as const) {
+    it(`finds the monogram's top-left corner under its pixel (${format})`, () => {
+      const L = LAYOUT[format], p = screenToWorld(L.mono.x, L.mono.y, HERO_CAMERA[format], format);
+      expect(p.distanceTo(worldOf(0, 300))).toBeLessThan(1e-6);
     });
   }
 });

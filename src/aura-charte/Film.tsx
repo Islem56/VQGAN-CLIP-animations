@@ -1,7 +1,10 @@
 // Aura Luna — « La charte en mouvement » (31.7 s, 16 bars at 121 BPM). The film is assembled here, chapter by chapter.
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { C, FPS } from "./lib";
+import { C, FPS, TL } from "./lib";
+import { Stage } from "./three/Stage";
+import { ChapterADN } from "./three/ChapterADN";
+import { cameraAt } from "./three/anamorph";
 import { pageAt } from "./layout";
 import { Page } from "./Page";
 import { useFont } from "../shared/motion";
@@ -10,6 +13,7 @@ export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.COSMOS }} />;
   return (
     <AbsoluteFill style={{ backgroundColor: pageAt(t).dark ? C.COSMOS : C.LUNAIRE }}>
+      {t < TL.flash + 0.3 && <Stage format={format} camera={cameraAt(t, format)}><ChapterADN t={t} format={format} /></Stage>}
       <Page format={format} t={t} />
     </AbsoluteFill>
   );

@@ -9,7 +9,7 @@ export const FRAMES = Math.round(TL.duration * TL.fps);
 
 /* The brand palette (guidelines, 04 · Couleurs). Éclipse is only ever the dot. */
 export const C = {
-  COSMOS: "#02060E", NUIT: "#1F0533", AURA: "#59047C", LUNA: "#7604A0", HALO: "#9303C5",
+  COSMOS: "#02060E", NUIT: "#1F0533", ORBITE: "#3C0557", AURA: "#59047C", LUNA: "#7604A0", HALO: "#9303C5",
   BLANC: "#FFFFFF", LUNAIRE: "#F4F1F7", BRUME: "#E2D3EC", ARDOISE: "#6E6A75", ECLIPSE: "#D53207",
   LOGO_A: "#750BB5", LOGO_B: "#130F20", // the monogram's gradient, sampled from the logo file
 };

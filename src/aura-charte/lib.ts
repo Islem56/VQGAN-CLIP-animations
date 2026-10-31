@@ -17,7 +17,7 @@ const at = (p: Pos) => bar(p[0], p[1]);
 /** every named beat in seconds: a single [bar, beat] becomes a number, a list becomes a list */
 export const TL = Object.fromEntries(
   Object.entries(TIMELINE.beats).map(([k, v]) => [k, Array.isArray(v[0]) ? (v as Pos[]).map(at) : at(v as Pos)]),
-) as { [K in keyof Beats]: Beats[K] extends Pos[] ? number[] : number };
+) as { [K in keyof Beats]: Beats[K] extends number[][] ? number[] : number };
 
 export type ChapterId = "adn" | "logo" | "couleurs" | "typo" | "signature";
 export const CHAPTERS: { id: ChapterId; from: number; to: number }[] = [
