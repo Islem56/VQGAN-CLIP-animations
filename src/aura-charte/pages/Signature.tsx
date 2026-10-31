@@ -21,8 +21,8 @@ export const Signature: React.FC<{ t: number; format: Format }> = ({ t, format }
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", inset: 0 }}>
       <defs><MonoGradients id="sg" x0={c.mono.x} y0={c.mono.y} w={c.mono.w} /></defs>
-      <radialGradient id="sgLight" cx={W / 2} cy={H / 2} r={Math.hypot(W, H) * 0.62 * signatureLight(t) + 1} gradientUnits="userSpaceOnUse">
-        <stop offset="0" stopColor={C.LUNAIRE} /><stop offset="0.8" stopColor={C.LUNAIRE} /><stop offset="1" stopColor={C.LUNAIRE} stopOpacity={0} />
+      <radialGradient id="sgLight" cx={W / 2} cy={H / 2} r={Math.hypot(W, H) * 0.95 * signatureLight(t) + 1} gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor={C.LUNAIRE} /><stop offset="0.5" stopColor={C.LUNAIRE} /><stop offset="0.8" stopColor={C.LUNAIRE} stopOpacity={0.45} /><stop offset="1" stopColor={C.LUNAIRE} stopOpacity={0} />
       </radialGradient>
       <rect width={W} height={H} fill={signatureLight(t) >= 1 ? C.LUNAIRE : "url(#sgLight)"} />
       <g transform={`translate(${cx} ${cy}) scale(${push.toFixed(5)}) translate(${-cx} ${-cy})`}>

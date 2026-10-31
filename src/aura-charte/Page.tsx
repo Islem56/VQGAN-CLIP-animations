@@ -66,7 +66,7 @@ export const Triad: React.FC<{ format: Format; t: number }> = ({ format, t }) =>
 /** the page frame at time t, cross-fading for 0.3 s after each change */
 export const Page: React.FC<{ format: Format; t: number }> = ({ format, t }) => {
   const L = LAYOUT[format], i = pageIndexAt(t), [t0, cur] = PAGE_CHANGES[i];
-  const prev = i > 0 ? PAGE_CHANGES[i - 1][1] : null, enter = prog(t, 0, 0.4);
+  const prev = i > 0 ? PAGE_CHANGES[i - 1][1] : null, enter = 1;   // the page is there from frame 0: the first frame is the thumbnail
   const out = prev ? 1 - clamp((t - t0) / 0.15) : 0, inn = prev ? clamp((t - t0 - 0.15) / 0.15) : 1;
   const kept = prev ? PARTS.filter((part) => same(prev, cur, part)) : PARTS, changed = PARTS.filter((part) => !kept.includes(part));
   return (
