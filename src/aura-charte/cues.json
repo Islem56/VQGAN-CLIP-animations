@@ -1,0 +1,220 @@
+[
+ {
+  "t": 0.1,
+  "type": "appear",
+  "desc": "the page opens: a glass tap",
+  "glass": true
+ },
+ {
+  "t": 0.992,
+  "type": "appear",
+  "desc": "the point leaves the page number"
+ },
+ {
+  "t": 1.342,
+  "type": "movement",
+  "desc": "the line of light"
+ },
+ {
+  "t": 2.975,
+  "type": "appear",
+  "desc": "glass plane 1 (circle)",
+  "glass": true
+ },
+ {
+  "t": 3.471,
+  "type": "appear",
+  "desc": "glass plane 2 (square)",
+  "glass": true
+ },
+ {
+  "t": 3.967,
+  "type": "appear",
+  "desc": "glass plane 3 (triangle)",
+  "glass": true
+ },
+ {
+  "t": 5.95,
+  "type": "movement",
+  "desc": "the planes take volume, the camera starts to orbit"
+ },
+ {
+  "t": 6.942,
+  "type": "appear",
+  "desc": "the compass cut 1",
+  "glass": true
+ },
+ {
+  "t": 7.438,
+  "type": "appear",
+  "desc": "the compass cut 2",
+  "glass": true
+ },
+ {
+  "t": 7.934,
+  "type": "scene_cut",
+  "desc": "page 03 · Logo: into the space"
+ },
+ {
+  "t": 9.917,
+  "type": "build_up",
+  "desc": "riser into the alignment",
+  "dur": 1.983
+ },
+ {
+  "t": 11.901,
+  "type": "reveal",
+  "desc": "the alignment: the monogram exists (the loudest hit)"
+ },
+ {
+  "t": 12.397,
+  "type": "appear",
+  "desc": "the light reads A",
+  "glass": true
+ },
+ {
+  "t": 12.893,
+  "type": "appear",
+  "desc": "the light reads the left L",
+  "glass": true
+ },
+ {
+  "t": 13.388,
+  "type": "appear",
+  "desc": "the light reads the right L",
+  "glass": true
+ },
+ {
+  "t": 13.884,
+  "type": "scene_cut",
+  "desc": "the flash: the point becomes light"
+ },
+ {
+  "t": 14.184,
+  "type": "appear",
+  "desc": "the pieces take the official gradient"
+ },
+ {
+  "t": 15.868,
+  "type": "scene_cut",
+  "desc": "page 04 · Couleurs"
+ },
+ {
+  "t": 15.868,
+  "type": "appear",
+  "desc": "capsule 1 fills",
+  "glass": true
+ },
+ {
+  "t": 16.116,
+  "type": "appear",
+  "desc": "capsule 2 fills",
+  "glass": true
+ },
+ {
+  "t": 16.364,
+  "type": "appear",
+  "desc": "capsule 3 fills",
+  "glass": true
+ },
+ {
+  "t": 16.612,
+  "type": "appear",
+  "desc": "capsule 4 fills",
+  "glass": true
+ },
+ {
+  "t": 16.86,
+  "type": "appear",
+  "desc": "capsule 5 fills",
+  "glass": true
+ },
+ {
+  "t": 17.107,
+  "type": "appear",
+  "desc": "capsule 6 fills",
+  "glass": true
+ },
+ {
+  "t": 18.351,
+  "type": "appear",
+  "desc": "the accent: the point lands"
+ },
+ {
+  "t": 19.835,
+  "type": "scene_cut",
+  "desc": "the Cosmos capsule becomes the page"
+ },
+ {
+  "t": 22.118,
+  "type": "movement",
+  "desc": "the lens crosses the halo"
+ },
+ {
+  "t": 23.802,
+  "type": "hover_or_small_ui",
+  "desc": "AURA LUNA, letter 1"
+ },
+ {
+  "t": 23.922,
+  "type": "hover_or_small_ui",
+  "desc": "AURA LUNA, letter 3"
+ },
+ {
+  "t": 24.042,
+  "type": "hover_or_small_ui",
+  "desc": "AURA LUNA, letter 5"
+ },
+ {
+  "t": 24.162,
+  "type": "hover_or_small_ui",
+  "desc": "AURA LUNA, letter 7"
+ },
+ {
+  "t": 24.402,
+  "type": "appear",
+  "desc": "Asik Regular",
+  "glass": true
+ },
+ {
+  "t": 25.785,
+  "type": "hover_or_small_ui",
+  "desc": "weight Light"
+ },
+ {
+  "t": 26.281,
+  "type": "hover_or_small_ui",
+  "desc": "weight Regular"
+ },
+ {
+  "t": 26.777,
+  "type": "hover_or_small_ui",
+  "desc": "weight Medium"
+ },
+ {
+  "t": 27.273,
+  "type": "hover_or_small_ui",
+  "desc": "weight SemiBold"
+ },
+ {
+  "t": 27.521,
+  "type": "hover_or_small_ui",
+  "desc": "weight Bold"
+ },
+ {
+  "t": 27.769,
+  "type": "movement",
+  "desc": "the light opens onto the signature"
+ },
+ {
+  "t": 28.069,
+  "type": "appear",
+  "desc": "the monogram"
+ },
+ {
+  "t": 28.669,
+  "type": "appear",
+  "desc": "DIGITAL · DESIGN · PRODUCTION",
+  "glass": true
+ }
+]
