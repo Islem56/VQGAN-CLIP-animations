@@ -25,7 +25,13 @@ export const MonoGradients: React.FC<{ id: string; x0: number; y0: number; w: nu
 /** one piece of the official monogram (its gradient defined by MonoGradients with the same id); `fill` overrides it */
 export const MonoPiece: React.FC<{ gid: string; piece: ModuleId; x0: number; y0: number; w: number; opacity?: number; fill?: string }> = ({ gid, piece, x0, y0, w, opacity = 1, fill }) => {
   const paint = fill ?? `url(#${gid}${gradOf(piece)})`;
-  return <path d={monoPath(piece, x0, y0, w)} fill={paint} stroke={paint} strokeWidth={0.8} strokeLinejoin="round" opacity={opacity} />;
+  return <path d={monoPath(piece, x0, y0, w)} fill={paint} stroke={paint} strokeWidth={1.6} strokeLinejoin="round" opacity={opacity} />;
+};
+
+/** the monogram's whole outline in the central gradient: laid under the pieces, it closes the hairline seams between them */
+export const MonoBase: React.FC<{ gid: string; x0: number; y0: number; w: number; opacity?: number }> = ({ gid, x0, y0, w, opacity = 1 }) => {
+  const k = w / 640;
+  return <path d={(MONO.union as number[][]).map((l) => loopD(l, (x, y) => [x0 + x * k, y0 + y * k])).join("")} fill={`url(#${gid}A)`} opacity={opacity} />;
 };
 
 /** the Asik wordmark, one path per letter, centred on cx with its baseline at `baseline` */

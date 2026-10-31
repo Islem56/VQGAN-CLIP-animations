@@ -7,6 +7,8 @@ import { BACKDROP_SIZE, backdropAt, ChapterLogo, warmAt } from "./three/ChapterL
 import { LogoOverlay } from "./LogoOverlay";
 import { LogoPage } from "./pages/LogoPage";
 import { Couleurs } from "./pages/Couleurs";
+import { Typo } from "./pages/Typo";
+import { Signature } from "./pages/Signature";
 import { ChapterADN } from "./three/ChapterADN";
 import { cameraAt } from "./three/anamorph";
 import { pageAt } from "./layout";
@@ -16,7 +18,7 @@ export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
   const ready = useFont(), t = useCurrentFrame() / FPS;
   if (!ready) return <AbsoluteFill style={{ backgroundColor: C.COSMOS }} />;
   return (
-    <AbsoluteFill style={{ backgroundColor: pageAt(t).dark ? C.COSMOS : C.LUNAIRE }}>
+    <AbsoluteFill style={{ backgroundColor: pageAt(t).dark || t >= TL.sign ? C.COSMOS : C.LUNAIRE }}>
       {t < TL.flash + 0.2 && (
         <Stage format={format} camera={cameraAt(t, format)}>
           <Backdrop at={backdropAt(t, format)} size={BACKDROP_SIZE[format]} warm={warmAt(t, format)} />
@@ -26,6 +28,8 @@ export const AuraCharte: React.FC<{ format: "h" | "v" }> = ({ format }) => {
       )}
       <LogoPage t={t} format={format} />
       <Couleurs t={t} format={format} />
+      <Typo t={t} format={format} />
+      <Signature t={t} format={format} />
       <LogoOverlay t={t} format={format} />
       <Page format={format} t={t} />
     </AbsoluteFill>

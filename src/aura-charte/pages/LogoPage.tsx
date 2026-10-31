@@ -3,7 +3,7 @@
 import React from "react";
 import { C, ease, lin, TL } from "../lib";
 import { Format, LAYOUT } from "../layout";
-import { MODULES, MonoGradients, MonoPiece, monoPath, wordmarkLetters } from "./brand";
+import { MODULES, MonoBase, MonoGradients, MonoPiece, monoPath, wordmarkLetters } from "./brand";
 
 const CIRCLES = [[303.5, 150, 151.5], [0, 150, 152], [152, 150, 152], [300, 150, 148], [455, 150, 155]];
 
@@ -21,6 +21,7 @@ export const LogoPage: React.FC<{ t: number; format: Format }> = ({ t, format })
           {[0, 150, 300].map((v) => <line key={`h${v}`} x1={X(-30)} x2={X(670)} y1={Y(v)} y2={Y(v)} strokeDasharray="6 6" />)}
           {[0, 152, 300, 455, 640].map((u) => <line key={`v${u}`} y1={Y(-28)} y2={Y(328)} x1={X(u)} x2={X(u)} strokeDasharray="6 6" />)}
         </g>
+        <MonoBase gid="lp" x0={x} y0={y} w={w} opacity={ease.out(lin(t, TL.flash + 0.05 + 0.045 * 5, 0.3))} />
         {MODULES.map((id, i) => {
           const e = ease.out(lin(t, TL.flash + 0.05 + 0.045 * i, 0.3));
           return (
