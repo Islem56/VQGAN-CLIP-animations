@@ -11,3 +11,5 @@ Config.setRspack(true);
 Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);
 Config.setDefaultPremountInSeconds(2);
+// WebGL on the CPU (SwiftShader through ANGLE): the glass in chapters 02–03 is rendered with three.js
+Config.setChromiumOpenGlRenderer("swangle");
