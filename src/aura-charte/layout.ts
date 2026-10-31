@@ -23,7 +23,7 @@ export const LAYOUT: Record<Format, PageLayout> = {
     bodyY: 352, bodySize: 21, triadY: 352,
     content: { x: 96, y: 300, w: 1728, h: 660 },
     mono: { x: 660, y: 330, w: 600 },
-    wordmark: { cx: 960, baseline: 760, scale: 0.78 },
+    wordmark: { cx: 960, baseline: 747, scale: 1.027 },   // as in the logo file: AURA LUNA is 1.31 × the monogram's width
   },
   v: {
     W: 1080, H: 1920, margin: 80,
@@ -32,7 +32,7 @@ export const LAYOUT: Record<Format, PageLayout> = {
     bodyY: 574, bodySize: 24, triadY: 574,
     content: { x: 80, y: 600, w: 920, h: 840 },
     mono: { x: 180, y: 700, w: 720 },
-    wordmark: { cx: 540, baseline: 1200, scale: 0.88 },
+    wordmark: { cx: 540, baseline: 1200, scale: 1.233 },  // as in the logo file: AURA LUNA is 1.31 × the monogram's width
   },
 };
 
