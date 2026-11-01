@@ -12,3 +12,6 @@ __pycache__
 # runtime audio (Mixkit: never commit) and the sound tools' venv
 .sound-cache/
 .sound-effects/
+
+# reference-derived stills for client mock-ups (never committed)
+public/refka/
