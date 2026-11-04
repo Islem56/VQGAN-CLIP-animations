@@ -1,0 +1,85 @@
+[
+ {
+  "t": 0.1,
+  "type": "appear",
+  "desc": "hook: the first words"
+ },
+ {
+  "t": 0.36,
+  "type": "movement",
+  "desc": "the gold word rises from behind her head"
+ },
+ {
+  "t": 1.983,
+  "type": "scene_cut",
+  "desc": "jump cut: the B-roll window"
+ },
+ {
+  "t": 2.043,
+  "type": "appear",
+  "desc": "the window opens",
+  "glass": true
+ },
+ {
+  "t": 4.959,
+  "type": "scene_cut",
+  "desc": "jump cut: the 3D elements"
+ },
+ {
+  "t": 5.019,
+  "type": "appear",
+  "desc": "elements spring out from behind her (1)"
+ },
+ {
+  "t": 5.079,
+  "type": "appear",
+  "desc": "elements spring out from behind her (2)"
+ },
+ {
+  "t": 5.139,
+  "type": "appear",
+  "desc": "elements spring out from behind her (3)"
+ },
+ {
+  "t": 5.219,
+  "type": "appear",
+  "desc": "elements spring out from behind her (4)"
+ },
+ {
+  "t": 7.934,
+  "type": "scene_cut",
+  "desc": "punch-in: the keyword"
+ },
+ {
+  "t": 8.234,
+  "type": "appear",
+  "desc": "the gold keyword lands"
+ },
+ {
+  "t": 8.884,
+  "type": "build_up",
+  "desc": "riser into the full-screen scene",
+  "dur": 1.033
+ },
+ {
+  "t": 9.917,
+  "type": "reveal",
+  "desc": "the PRP scene opens behind her (the loudest hit)"
+ },
+ {
+  "t": 10.067,
+  "type": "movement",
+  "desc": "the tubes rise"
+ },
+ {
+  "t": 13.884,
+  "type": "scene_cut",
+  "desc": "the end card"
+ },
+ {
+  "t": 14.384,
+  "type": "appear",
+  "desc": "the Instagram glyph",
+  "glass": true
+ }
+]

@@ -54,7 +54,7 @@ export const Window: React.FC<{ x: number; y: number; w: number; h: number; chil
 /* ───────── the hair follicle, in section (skin, follicle, bulb, papilla, gland, vessels, nutrients) ───────── */
 const wave = (y: number, a = 6) => `M-10,${y} C120,${y - a * 1.6} 220,${y + a} 340,${y} S560,${y - a * 1.4} 680,${y + a * 0.6} S820,${y - a} 820,${y}`;
 
-const FollicleUnit: React.FC<{ x: number; top: number; depth: number; tilt: number; s?: number; detail?: boolean; id: string }> = ({ x, top, depth, tilt, s = 1, detail = true, id }) => {
+const FollicleUnit: React.FC<{ x: number; top: number; depth: number; tilt: number; s?: number; detail?: boolean; id: string; t?: number }> = ({ x, top, depth, tilt, s = 1, detail = true, id, t }) => {
   const bw = 23 * s, bulbY = top + depth, sh = 8.5 * s;
   return (
     <g transform={`rotate(${tilt} ${x} ${top})`}>
@@ -78,13 +78,23 @@ const FollicleUnit: React.FC<{ x: number; top: number; depth: number; tilt: numb
       <ellipse cx={x} cy={bulbY - 4 * s} rx={30 * s} ry={25 * s} fill={`url(#bulb)`} />
       <path d={`M${x - 13 * s},${bulbY + 18 * s} Q${x - 15 * s},${bulbY - 14 * s} ${x},${bulbY - 16 * s} Q${x + 15 * s},${bulbY - 14 * s} ${x + 13 * s},${bulbY + 18 * s} Z`} fill="url(#papilla)" />
       {detail && <path d={`M${x - 5 * s},${bulbY + 60 * s} C${x - 8 * s},${bulbY + 20 * s} ${x - 6 * s},${bulbY - 4 * s} ${x},${bulbY - 6 * s} C${x + 6 * s},${bulbY - 4 * s} ${x + 8 * s},${bulbY + 20 * s} ${x + 5 * s},${bulbY + 60 * s}`} stroke="#C2393A" strokeWidth={3 * s} fill="none" />}
+      {/* animated: nutrients climbing the capillary into the papilla, which glows as they arrive */}
+      {detail && t !== undefined && (
+        <g filter="url(#glow)">
+          <ellipse cx={x} cy={bulbY + 2 * s} rx={15 * s} ry={13 * s} fill={R.OR} opacity={0.18 + 0.14 * Math.sin(t * 5)} />
+          {Array.from({ length: 6 }, (_, k) => {
+            const ph = (t * 0.85 + k / 6) % 1, o = ph < 0.12 ? ph / 0.12 : ph > 0.82 ? (1 - ph) / 0.18 : 1;
+            return <circle key={k} cx={x + Math.sin(ph * 7 + k) * 3 * s} cy={bulbY + 66 * s - ph * 74 * s} r={3.6 * s} fill="url(#dot)" opacity={o} />;
+          })}
+        </g>
+      )}
       {/* the hair shaft, out through the skin and up out of the frame */}
       <path d={`M${x - sh},${bulbY - 22 * s} L${x - sh * 0.9},${top - 420} L${x + sh * 0.9},${top - 420} L${x + sh},${bulbY - 22 * s} Z`} fill={`url(#shaft-${id})`} />
     </g>
   );
 };
 
-export const Follicle: React.FC<{ w: number; h: number }> = ({ w, h }) => (
+export const Follicle: React.FC<{ w: number; h: number; t?: number }> = ({ w, h, t }) => (
   <svg width={w} height={h} viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice" style={{ display: "block" }}>
     <defs>
       <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2E2522" /><stop offset="1" stopColor="#7B6156" /></linearGradient>
@@ -122,15 +132,15 @@ export const Follicle: React.FC<{ w: number; h: number }> = ({ w, h }) => (
       <FollicleUnit id="b" x={500} top={150} depth={190} tilt={-14} s={0.82} detail={false} />
       <FollicleUnit id="c" x={700} top={150} depth={175} tilt={-10} s={0.78} detail={false} />
     </g>
-    <FollicleUnit id="a" x={118} top={150} depth={212} tilt={-9} />
+    <FollicleUnit id="a" x={118} top={150} depth={212} tilt={-9} t={t} />
     {/* stray hairs from follicles out of view */}
-    {[[40, -16], [330, -10], [610, -14], [770, -8]].map(([x, t], i) => (
-      <path key={i} d={`M${x - 6},152 L${x - 5},-30 L${x + 5},-30 L${x + 6},152 Z`} fill="url(#shaft-a)" transform={`rotate(${t} ${x} 150)`} opacity={0.95} />
+    {[[40, -16], [330, -10], [610, -14], [770, -8]].map(([x, a], i) => (
+      <path key={i} d={`M${x - 6},152 L${x - 5},-30 L${x + 5},-30 L${x + 6},152 Z`} fill="url(#shaft-a)" transform={`rotate(${a} ${x} 150)`} opacity={0.95} />
     ))}
     {/* nutrients: gold particles carried by the capillary to the papilla */}
     <g filter="url(#glow)">
       {[[118, 398, 5], [150, 392, 4], [186, 396, 5.5], [221, 384, 4.5], [236, 360, 5], [212, 336, 3.5], [262, 318, 3], [168, 300, 3.2], [300, 404, 4]].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="url(#dot)" />
+        <circle key={i} cx={t === undefined ? x : ((x + t * 46) % 830) - 15} cy={y} r={r} fill="url(#dot)" />
       ))}
     </g>
     <rect width={800} height={450} filter="url(#grain)" opacity={0.18} style={{ mixBlendMode: "multiply" }} />

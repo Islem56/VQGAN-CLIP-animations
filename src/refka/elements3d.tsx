@@ -124,7 +124,7 @@ export const Molecule: React.FC<{ at: At; z?: number; s?: number; rot?: V3 }> = 
 };
 
 /** a short DNA strand: two pearl backbones, gold and rose base pairs */
-export const DNA: React.FC<{ at: At; z?: number; s?: number; rot?: V3; n?: number }> = ({ at, z = 0, s = 1, rot = [0, 0, 0.5], n = 16 }) => {
+export const DNA: React.FC<{ at: At; z?: number; s?: number; rot?: V3; n?: number; spin?: number }> = ({ at, z = 0, s = 1, rot = [0, 0, 0.5], n = 16, spin = 0 }) => {
   const { tubes, rungs, mats } = useMemo(() => {
     const R0 = 52, step = 24, tw = 0.6, pt = (t: number, ph: number): V3 => [R0 * Math.cos(t * tw + ph), (t - (n - 1) / 2) * step, R0 * Math.sin(t * tw + ph)];
     const strand = (ph: number) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(Array.from({ length: (n - 1) * 4 + 1 }, (_, i) => new THREE.Vector3(...pt(i / 4, ph)))), 240, 8, 16, false);
@@ -133,6 +133,7 @@ export const DNA: React.FC<{ at: At; z?: number; s?: number; rot?: V3; n?: numbe
   }, [n]);
   return (
     <group position={[...px(...at), z]} rotation={rot} scale={s}>
+      <group rotation={[0, spin, 0]}>
       {tubes.map((g, i) => <mesh key={i} geometry={g} material={mats.back} />)}
       {rungs.map(({ a, b, m }, i) => (
         <React.Fragment key={i}>
@@ -140,6 +141,7 @@ export const DNA: React.FC<{ at: At; z?: number; s?: number; rot?: V3; n?: numbe
           <Bond a={m} b={b} r={4.5} mat={i % 2 ? mats.r : mats.g} />
         </React.Fragment>
       ))}
+      </group>
     </group>
   );
 };
@@ -196,12 +198,14 @@ export const Tube: React.FC<{ at: At; z?: number; r: number; len: number; tilt?:
 };
 
 /** small glowing platelets drifting in the plasma light */
-export const Droplets: React.FC<{ n: number; box: [number, number, number, number]; rMin: number; rMax: number; seed: string; z?: number }> = ({ n, box, rMin, rMax, seed, z = 0 }) => {
+export const Droplets: React.FC<{ n: number; box: [number, number, number, number]; rMin: number; rMax: number; seed: string; z?: number; t?: number }> = ({ n, box, rMin, rMax, seed, z = 0, t = 0 }) => {
   const mat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: "#F6D37A", roughness: 0.1, clearcoat: 1, emissive: "#E3A83A", emissiveIntensity: 0.6 }), []);
   return (
     <>
       {Array.from({ length: n }, (_, i) => {
-        const x = box[0] + random(`${seed}x${i}`) * (box[2] - box[0]), y = box[1] + random(`${seed}y${i}`) * (box[3] - box[1]);
+        const span = box[3] - box[1], rise = t * (24 + 40 * random(`${seed}v${i}`));
+        const x = box[0] + random(`${seed}x${i}`) * (box[2] - box[0]) + Math.sin(t * 1.3 + i) * 6;
+        const y = box[1] + ((((random(`${seed}y${i}`) * span - rise) % span) + span) % span);
         const r = rMin + random(`${seed}r${i}`) ** 2 * (rMax - rMin);
         return <mesh key={i} position={[...px(x, y), z]} material={mat}><sphereGeometry args={[r, 32, 24]} /></mesh>;
       })}
